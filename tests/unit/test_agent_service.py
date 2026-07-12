@@ -1,0 +1,141 @@
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
+
+from app.core.config import Settings
+from app.schemas.query import Citation
+from app.services.agent_service import AgentService, resolve_route
+from app.services.llm.base import ChatResult, ToolCall
+
+
+def test_resolve_route() -> None:
+    assert resolve_route(["retrieve_documents"]) == "retrieve"
+    assert resolve_route(["web_search"]) == "web"
+    assert resolve_route(["answer_directly"]) == "direct"
+    assert resolve_route(["retrieve_documents", "web_search"]) == "mixed"
+    assert resolve_route([]) == "direct"
+
+
+@pytest.mark.asyncio
+async def test_agent_direct_answer_without_tools() -> None:
+    llm = AsyncMock()
+    llm.chat_with_tools.return_value = ChatResult(content="Hello!", tool_calls=[])
+    rag = MagicMock()
+    service = AgentService(rag_service=rag, llm=llm)
+
+    response = await service.answer_question(MagicMock(id="u1"), "Hi")
+    assert response.answer == "Hello!"
+    assert response.route == "direct"
+    assert response.tools_used == []
+    assert response.citations == []
+    assert response.model_mode == "auto"
+    assert response.model_provider == "openai"
+
+
+@pytest.mark.asyncio
+async def test_agent_uses_retrieve_tool() -> None:
+    llm = AsyncMock()
+    llm.chat_with_tools.side_effect = [
+        ChatResult(
+            content=None,
+            tool_calls=[
+                ToolCall(
+                    id="call-1",
+                    name="retrieve_documents",
+                    arguments={"query": "refund"},
+                )
+            ],
+        ),
+        ChatResult(content="Refunds are allowed within 30 days.", tool_calls=[]),
+    ]
+
+    rag = AsyncMock()
+    chunk = MagicMock()
+    chunk.id = "c1"
+    chunk.chunk_index = 0
+    chunk.content = "Refunds within 30 days."
+    document = MagicMock()
+    document.id = "d1"
+    document.filename = "policy.txt"
+    retrieved = MagicMock(chunk=chunk, document=document, score=0.91)
+    rag.retrieve.return_value = [retrieved]
+
+    settings = Settings(openai_api_key="openai", agent_max_tool_rounds=3)
+
+    service = AgentService(rag_service=rag, settings=settings, llm=llm)
+    response = await service.answer_question(MagicMock(id="u1"), "What is the refund policy?")
+
+    assert "30 days" in response.answer
+    assert response.route == "retrieve"
+    assert response.tools_used == ["retrieve_documents"]
+    assert len(response.citations) == 1
+    assert response.citations[0].document_name == "policy.txt"
+    assert "Auto mode inspected" in response.model_selection_explanation
+
+
+@pytest.mark.asyncio
+async def test_agent_web_search_without_key() -> None:
+    llm = AsyncMock()
+    llm.chat_with_tools.side_effect = [
+        ChatResult(
+            content=None,
+            tool_calls=[ToolCall(id="call-1", name="web_search", arguments={"query": "paris"})],
+        ),
+        ChatResult(content="I do not have live weather data.", tool_calls=[]),
+    ]
+    settings = Settings(openai_api_key="openai", agent_max_tool_rounds=3)
+    service = AgentService(rag_service=AsyncMock(), settings=settings, llm=llm)
+
+    response = await service.answer_question(MagicMock(id="u1"), "Weather in Paris?")
+    assert response.route == "web"
+    assert "web_search" in response.tools_used
+
+
+@pytest.mark.asyncio
+async def test_agent_max_rounds_forces_final_answer() -> None:
+    llm = AsyncMock()
+    llm.chat_with_tools.side_effect = [
+        ChatResult(
+            content=None,
+            tool_calls=[
+                ToolCall(id="c1", name="answer_directly", arguments={"reason": "greeting"})
+            ],
+        ),
+        ChatResult(content="Final after cap.", tool_calls=[]),
+    ]
+    settings = Settings(openai_api_key="openai", agent_max_tool_rounds=1)
+    service = AgentService(rag_service=AsyncMock(), settings=settings, llm=llm)
+
+    response = await service.answer_question(MagicMock(id="u1"), "Hello")
+    assert response.answer == "Final after cap."
+    assert response.tools_used == ["answer_directly"]
+
+
+def test_citation_model_supports_web() -> None:
+    citation = Citation(
+        source_type="web",
+        document_name="Example",
+        excerpt="Snippet",
+        url="https://example.com",
+        score=0.5,
+    )
+    assert citation.source_type == "web"
+
+
+@pytest.mark.asyncio
+async def test_agent_honors_user_selected_anthropic_model() -> None:
+    llm = AsyncMock()
+    llm.chat_with_tools.return_value = ChatResult(content="Selected model answer.", tool_calls=[])
+    rag = MagicMock()
+    service = AgentService(rag_service=rag, llm=llm)
+
+    response = await service.answer_question(
+        MagicMock(id="u1"),
+        "Explain the tradeoffs.",
+        model_mode="anthropic",
+        model_name="claude-sonnet-4-20250514",
+    )
+
+    assert response.model_mode == "anthropic"
+    assert response.model_provider == "anthropic"
+    assert response.model_name == "claude-sonnet-4-20250514"
