@@ -1,0 +1,62 @@
+[
+  {
+    "id": "retrieve_refund",
+    "question": "What is the refund policy?",
+    "expected_route": "retrieve",
+    "expected_keywords": ["refund", "30", "days"],
+    "context_excerpts": [
+      "Our refund policy allows returns within 30 days of purchase."
+    ],
+    "sample_answer": "Returns are allowed within 30 days of purchase.",
+    "sample_retrieved": [
+      "Our refund policy allows returns within 30 days of purchase."
+    ]
+  },
+  {
+    "id": "direct_greeting",
+    "question": "Hello, how are you?",
+    "expected_route": "direct",
+    "expected_keywords": [],
+    "context_excerpts": [],
+    "sample_answer": "Hello! I am doing well. How can I help you today?",
+    "sample_retrieved": []
+  },
+  {
+    "id": "web_current_event",
+    "question": "What is the current weather in Paris right now?",
+    "expected_route": "web",
+    "expected_keywords": ["paris", "weather"],
+    "context_excerpts": [
+      "Paris weather today: partly cloudy, 18 C."
+    ],
+    "sample_answer": "Current conditions in Paris are partly cloudy around 18 C.",
+    "sample_retrieved": []
+  },
+  {
+    "id": "retrieve_shipping",
+    "question": "How long does standard shipping take?",
+    "expected_route": "retrieve",
+    "expected_keywords": ["shipping", "5", "business"],
+    "context_excerpts": [
+      "Standard shipping takes 5-7 business days."
+    ],
+    "sample_answer": "Standard shipping takes 5-7 business days.",
+    "sample_retrieved": [
+      "Standard shipping takes 5-7 business days."
+    ]
+  },
+  {
+    "id": "ungrounded_hallucination",
+    "question": "What is the warranty period?",
+    "expected_route": "retrieve",
+    "expected_keywords": ["warranty"],
+    "context_excerpts": [
+      "Products include a 12-month limited warranty."
+    ],
+    "sample_answer": "The warranty lasts forever with free replacements for life.",
+    "sample_retrieved": [
+      "Products include a 12-month limited warranty."
+    ],
+    "expect_low_groundedness": true
+  }
+]
