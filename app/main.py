@@ -1,8 +1,10 @@
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
@@ -41,22 +43,47 @@ def register_exception_handlers(app: FastAPI) -> None:
         )
 
 
+def _mount_frontend(app: FastAPI, static_dir: Path) -> None:
+    if not static_dir.is_dir():
+        logger.info("frontend_static_missing", path=str(static_dir))
+        return
+
+    index_file = static_dir / "index.html"
+    assets_dir = static_dir / "assets"
+    if assets_dir.is_dir():
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+
+    @app.get("/")
+    async def serve_index() -> FileResponse:
+        return FileResponse(index_file)
+
+    @app.get("/{full_path:path}")
+    async def spa_fallback(full_path: str) -> FileResponse:
+        candidate = static_dir / full_path
+        if candidate.is_file():
+            return FileResponse(candidate)
+        return FileResponse(index_file)
+
+    logger.info("frontend_static_mounted", path=str(static_dir))
+
+
 def create_app() -> FastAPI:
     setup_logging()
     settings = get_settings()
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        from pathlib import Path
-
         Path(settings.upload_dir).mkdir(parents=True, exist_ok=True)
         logger.info("application_started", upload_dir=settings.upload_dir)
         yield
 
     app = FastAPI(
         title="Agentic RAG API",
-        description="Upload documents and ask questions with retrieval-augmented generation.",
-        version="0.1.0",
+        description=(
+            "Upload documents and ask questions. An agent routes between document "
+            "retrieval, web search, and direct answers, with citations."
+        ),
+        version="0.2.0",
         lifespan=lifespan,
     )
 
@@ -74,6 +101,8 @@ def create_app() -> FastAPI:
     @app.get("/health", tags=["health"])
     async def health_check() -> dict[str, str]:
         return {"status": "ok"}
+
+    _mount_frontend(app, Path(settings.static_dir))
 
     return app
 
