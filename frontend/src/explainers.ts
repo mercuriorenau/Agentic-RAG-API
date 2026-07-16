@@ -20,6 +20,10 @@ export const COST_GUARDRAIL =
   "Demo limit: 600 characters per question and 3 asks per IP per day. " +
   "That keeps public traffic from burning through API credits.";
 
+export const CONVERSATION_MEMORY =
+  "Follow-ups use the last few Q&A turns, so pronouns like \"he\" or \"that resume\" " +
+  "can refer to what you just discussed. Start a fresh question if you want a clean slate.";
+
 export const CITATIONS =
   "Each card is a source the model actually saw — a document chunk or a web " +
   "snippet. The score is similarity for retrieved chunks (higher is closer).";

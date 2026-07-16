@@ -5,6 +5,7 @@ import {
   deleteDocument,
   DocumentItem,
   getToken,
+  historyFromTurns,
   listDocuments,
   listModels,
   login,
@@ -18,6 +19,7 @@ import { Citations } from "./components/Citations";
 import { DocumentPanel } from "./components/DocumentPanel";
 import { AnswerExplainerBlock, Explainer } from "./components/Explainer";
 import {
+  CONVERSATION_MEMORY,
   COST_GUARDRAIL,
   explainAnswer,
   INTRO,
@@ -134,7 +136,13 @@ export default function App() {
     setError(null);
     setBusy(true);
     try {
-      const response = await askQuestion(trimmed, selected.mode, selected.model_name);
+      const history = historyFromTurns(turns);
+      const response = await askQuestion(
+        trimmed,
+        selected.mode,
+        selected.model_name,
+        history,
+      );
       setTurns((prev) => [{ question: trimmed, response }, ...prev]);
       setQuestion("");
     } catch (err) {
@@ -186,7 +194,18 @@ export default function App() {
         <section className="panel ask-panel">
           <h2>Ask</h2>
           <Explainer>{COST_GUARDRAIL}</Explainer>
+          <Explainer>{CONVERSATION_MEMORY}</Explainer>
           <form className="ask-form" onSubmit={handleAsk}>
+            <div className="ask-toolbar">
+              <button
+                type="button"
+                className="ghost"
+                disabled={busy || turns.length === 0}
+                onClick={() => setTurns([])}
+              >
+                Clear chat memory
+              </button>
+            </div>
             <label className="compact-label">
               Model
               <select
