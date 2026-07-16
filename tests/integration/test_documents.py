@@ -47,6 +47,30 @@ async def test_upload_list_and_delete_document(mock_openai_cls, client: AsyncCli
 
 
 @pytest.mark.asyncio
+@patch("app.services.embedding_service.AsyncOpenAI")
+async def test_preview_document_file(mock_openai_cls, client: AsyncClient) -> None:
+    mock_client = AsyncMock()
+    mock_openai_cls.return_value = mock_client
+    mock_client.embeddings.create.return_value = AsyncMock(data=[AsyncMock(embedding=[0.1] * 1536)])
+
+    token = await _register_and_login(client, email="preview@example.com")
+    headers = {"Authorization": f"Bearer {token}"}
+    content = b"Preview this resume text for Santiago."
+    upload = await client.post(
+        "/api/v1/documents",
+        headers=headers,
+        files={"file": ("resume.txt", content, "text/plain")},
+    )
+    assert upload.status_code == 201
+    document_id = upload.json()["id"]
+
+    preview = await client.get(f"/api/v1/documents/{document_id}/file", headers=headers)
+    assert preview.status_code == 200
+    assert preview.content == content
+    assert "text/plain" in preview.headers.get("content-type", "")
+
+
+@pytest.mark.asyncio
 async def test_upload_unsupported_file_type(client: AsyncClient) -> None:
     token = await _register_and_login(client, email="badfile@example.com")
     headers = {"Authorization": f"Bearer {token}"}
