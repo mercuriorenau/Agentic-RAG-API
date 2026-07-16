@@ -16,6 +16,13 @@ import {
 import { AuthForm } from "./components/AuthForm";
 import { Citations } from "./components/Citations";
 import { DocumentPanel } from "./components/DocumentPanel";
+import { AnswerExplainerBlock, Explainer } from "./components/Explainer";
+import {
+  COST_GUARDRAIL,
+  explainAnswer,
+  INTRO,
+  MODEL_PICKER,
+} from "./explainers";
 
 type ChatTurn = {
   question: string;
@@ -147,6 +154,7 @@ export default function App() {
             Upload files, then let an agent choose retrieval, web search, or a direct answer —
             with citations you can verify.
           </p>
+          <Explainer>{INTRO}</Explainer>
         </header>
         <AuthForm busy={busy} error={error} onSubmit={handleAuth} />
       </div>
@@ -177,10 +185,7 @@ export default function App() {
 
         <section className="panel ask-panel">
           <h2>Ask</h2>
-          <p className="muted">
-            Public demo guardrail: questions are limited to 600 characters and 3 requests
-            per IP per day to control LLM token costs.
-          </p>
+          <Explainer>{COST_GUARDRAIL}</Explainer>
           <form className="ask-form" onSubmit={handleAsk}>
             <label className="compact-label">
               Model
@@ -195,11 +200,8 @@ export default function App() {
                   </option>
                 ))}
               </select>
-              <span className="hint">
-                Auto inspects the question and chooses a configured provider. Or pick a
-                specific available model.
-              </span>
             </label>
+            <Explainer summary="Why the model picker matters">{MODEL_PICKER}</Explainer>
             <textarea
               value={question}
               onChange={(event) => setQuestion(event.target.value)}
@@ -214,30 +216,37 @@ export default function App() {
 
           <div className="turns">
             {turns.length === 0 ? (
-              <p className="muted">Answers appear here with route and citations.</p>
+              <p className="muted">
+                Answers appear here with route, model, citations, and a short walkthrough of
+                what the agent did.
+              </p>
             ) : (
-              turns.map((turn, index) => (
-                <article key={`${turn.question}-${index}`} className="turn">
-                  <p className="question">{turn.question}</p>
-                  <div className="meta">
-                    <span className="badge">{turn.response.route}</span>
-                    <span className="badge">
-                      {turn.response.model_provider}: {turn.response.model_name}
-                    </span>
-                    {turn.response.tools_used.map((tool) => (
-                      <span key={tool} className="badge subtle">
-                        {tool}
+              turns.map((turn, index) => {
+                const walkthrough = explainAnswer(turn.response);
+                return (
+                  <article key={`${turn.question}-${index}`} className="turn">
+                    <p className="question">{turn.question}</p>
+                    <div className="meta">
+                      <span className="badge">{turn.response.route}</span>
+                      <span className="badge">
+                        {turn.response.model_provider}: {turn.response.model_name}
                       </span>
-                    ))}
-                  </div>
-                  <details className="decision">
-                    <summary>How Auto/model selection worked</summary>
-                    <p>{turn.response.model_selection_explanation}</p>
-                  </details>
-                  <p className="answer">{turn.response.answer}</p>
-                  <Citations citations={turn.response.citations} />
-                </article>
-              ))
+                      {turn.response.tools_used.map((tool) => (
+                        <span key={tool} className="badge subtle">
+                          {tool}
+                        </span>
+                      ))}
+                    </div>
+                    <AnswerExplainerBlock
+                      title={walkthrough.title}
+                      paragraphs={walkthrough.paragraphs}
+                      open={index === 0}
+                    />
+                    <p className="answer">{turn.response.answer}</p>
+                    <Citations citations={turn.response.citations} />
+                  </article>
+                );
+              })
             )}
           </div>
         </section>
