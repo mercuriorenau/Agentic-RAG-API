@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     chunk_overlap: int = 100
     top_k: int = 5
     agent_max_tool_rounds: int = 3
+    conversation_history_max_turns: int = 6
     rate_limit_auth: str = "10/minute"
     rate_limit_query: str = "3/day"
     max_query_length: int = DEFAULT_MAX_QUERY_LENGTH

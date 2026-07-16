@@ -1,7 +1,7 @@
 from app.core.config import Settings, get_settings
 from app.core.logging import get_logger
 from app.models import User
-from app.schemas.query import Citation, QueryResponse
+from app.schemas.query import Citation, ConversationTurn, QueryResponse
 from app.services.llm.base import ChatMessage, LLMProvider
 from app.services.llm.factory import get_llm_provider
 from app.services.llm.model_selector import ModelSelection, select_model
@@ -19,7 +19,11 @@ SYSTEM_PROMPT = (
     "Use answer_directly for greetings, simple definitions, or math that needs no sources. "
     "After tool results arrive, produce a final answer. "
     "When document or web context is provided, ground the answer in that context and "
-    "do not invent unsupported facts. If context is insufficient, say you do not know."
+    "do not invent unsupported facts. If context is insufficient, say you do not know. "
+    "You may receive prior conversation turns. Resolve pronouns and follow-ups from that "
+    "history (for example 'he', 'she', 'that resume', 'the person above'). "
+    "If a follow-up still needs facts from uploaded files, call retrieve_documents again "
+    "with a clear search query; otherwise answer using the prior turns."
 )
 
 
@@ -57,9 +61,12 @@ class AgentService:
         *,
         model_mode: str = "auto",
         model_name: str | None = None,
+        history: list[ConversationTurn] | None = None,
     ) -> QueryResponse:
+        prior = _trim_history(history or [], self.settings.conversation_history_max_turns)
+        selection_text = _selection_text(question, prior)
         selection = select_model(
-            question,
+            selection_text,
             self.settings,
             requested_mode=model_mode,
             requested_model=model_name,
@@ -71,8 +78,11 @@ class AgentService:
         )
         messages: list[ChatMessage] = [
             ChatMessage(role="system", content=_system_prompt(selection)),
-            ChatMessage(role="user", content=question),
         ]
+        for turn in prior:
+            messages.append(ChatMessage(role="user", content=turn.question))
+            messages.append(ChatMessage(role="assistant", content=turn.answer))
+        messages.append(ChatMessage(role="user", content=question))
         context = ToolContext(
             user=user,
             rag_service=self.rag_service,
@@ -158,6 +168,31 @@ def _citation_key(citation: Citation) -> str:
     if citation.source_type == "web":
         return f"web:{citation.url or citation.excerpt[:80]}"
     return f"doc:{citation.chunk_id or citation.excerpt[:80]}"
+
+
+def _trim_history(
+    history: list[ConversationTurn],
+    max_turns: int,
+) -> list[ConversationTurn]:
+    if max_turns <= 0:
+        return []
+    trimmed = history[-max_turns:]
+    return [
+        ConversationTurn(
+            question=turn.question.strip()[:2000],
+            answer=turn.answer.strip()[:4000],
+        )
+        for turn in trimmed
+        if turn.question.strip() and turn.answer.strip()
+    ]
+
+
+def _selection_text(question: str, history: list[ConversationTurn]) -> str:
+    if not history:
+        return question
+    recent = history[-2:]
+    prior = " ".join(f"{turn.question} {turn.answer[:400]}" for turn in recent)
+    return f"{prior}\n{question}"
 
 
 def _system_prompt(selection: ModelSelection) -> str:

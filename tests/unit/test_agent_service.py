@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from app.core.config import Settings
-from app.schemas.query import Citation
+from app.schemas.query import Citation, ConversationTurn
 from app.services.agent_service import AgentService, resolve_route
 from app.services.llm.base import ChatResult, ToolCall
 
@@ -139,3 +139,30 @@ async def test_agent_honors_user_selected_anthropic_model() -> None:
     assert response.model_mode == "anthropic"
     assert response.model_provider == "anthropic"
     assert response.model_name == "claude-sonnet-4-20250514"
+
+
+@pytest.mark.asyncio
+async def test_agent_includes_conversation_history() -> None:
+    llm = AsyncMock()
+    llm.chat_with_tools.return_value = ChatResult(
+        content="Yes — based on the resume we just discussed, he looks hireable.",
+        tool_calls=[],
+    )
+    service = AgentService(rag_service=MagicMock(), llm=llm)
+
+    await service.answer_question(
+        MagicMock(id="u1"),
+        "do you think he is in a good position to find a job",
+        history=[
+            ConversationTurn(
+                question="im talking about Santiago his resume is uploaded",
+                answer="Santiago is a software engineering graduate with strong projects.",
+            )
+        ],
+    )
+
+    messages = llm.chat_with_tools.call_args.args[0]
+    roles = [message.role for message in messages]
+    assert roles == ["system", "user", "assistant", "user"]
+    assert "Santiago" in messages[1].content
+    assert "good position" in messages[3].content
