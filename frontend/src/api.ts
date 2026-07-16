@@ -129,6 +129,21 @@ export async function deleteDocument(id: string): Promise<void> {
   await request(`/api/v1/documents/${id}`, { method: "DELETE" }, true);
 }
 
+export async function fetchDocumentBlob(id: string): Promise<{ blob: Blob; filenameHint: string }> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated");
+  }
+  const response = await fetch(`/api/v1/documents/${id}/file`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) {
+    throw new Error(`Preview failed (${response.status})`);
+  }
+  const blob = await response.blob();
+  return { blob, filenameHint: id };
+}
+
 export async function listModels(): Promise<ModelOption[]> {
   const data = await request<{ models: ModelOption[] }>("/api/v1/models");
   return data.models;
