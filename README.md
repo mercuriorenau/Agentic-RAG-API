@@ -58,12 +58,15 @@ Deploy your own instance to Railway (see below) or run locally with Docker Compo
 | GET | `/api/v1/models` | No | List available model choices |
 | POST | `/api/v1/documents` | JWT | Upload document |
 | GET | `/api/v1/documents` | JWT | List documents |
+| GET | `/api/v1/documents/{id}/file` | JWT | Preview / download original file |
 | DELETE | `/api/v1/documents/{id}` | JWT | Delete document |
 | POST | `/api/v1/queries` | JWT | Ask a question (agent) |
 
 Interactive docs: `http://localhost:8000/docs`
 
 Query response includes `answer`, `citations`, `tools_used`, `route`, `model_provider`, `model_name`, and `model_selection_explanation`.
+
+`POST /api/v1/queries` accepts optional `history` (prior question/answer turns) so follow-ups like “is he a good hire?” resolve against the conversation, not only the latest sentence.
 
 Available models are exposed at `GET /api/v1/models`. The UI dropdown only shows providers whose API keys are configured.
 
