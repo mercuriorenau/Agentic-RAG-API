@@ -40,6 +40,8 @@ flowchart TB
 
 **Query:** the selected LLM calls tools as needed (`retrieve_documents`, `web_search`, `answer_directly`), then produces a final answer with citations and a `route` field (`retrieve` | `web` | `direct` | `mixed`).
 
+**UI walkthrough:** the web app shows short explainers next to upload, model choice, answers, and citations so you can see chunking, retrieval, tool routing, and grounding while you use the demo.
+
 ## Live demo
 
 Deploy your own instance to Railway (see below) or run locally with Docker Compose. Open the root URL for the web UI, or `/docs` for OpenAPI.
