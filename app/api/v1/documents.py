@@ -1,6 +1,8 @@
 import uuid
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
@@ -66,6 +68,31 @@ async def list_documents(
 ) -> DocumentListResponse:
     documents = await document_service.list_documents(current_user)
     return DocumentListResponse(documents=[_to_response(doc) for doc in documents])
+
+
+@router.get("/{document_id}/file")
+async def preview_document(
+    document_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    document_service: DocumentService = Depends(get_document_service),
+) -> FileResponse:
+    document = await document_service.get_document(current_user, document_id)
+    if document is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+
+    path = Path(document.file_path)
+    if not path.is_file():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document file is missing on disk",
+        )
+
+    return FileResponse(
+        path=path,
+        media_type=document.content_type or "application/octet-stream",
+        filename=document.filename,
+        content_disposition_type="inline",
+    )
 
 
 @router.delete("/{document_id}", status_code=204)
