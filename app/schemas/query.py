@@ -1,6 +1,11 @@
 from pydantic import BaseModel, Field
 
 
+class ConversationTurn(BaseModel):
+    question: str = Field(min_length=1, max_length=2000)
+    answer: str = Field(min_length=1, max_length=8000)
+
+
 class QueryRequest(BaseModel):
     question: str = Field(
         min_length=1,
@@ -14,6 +19,11 @@ class QueryRequest(BaseModel):
         default=None,
         max_length=80,
         description="Optional provider-specific model name override.",
+    )
+    history: list[ConversationTurn] = Field(
+        default_factory=list,
+        max_length=12,
+        description="Prior question/answer turns for follow-up context (oldest first).",
     )
 
 

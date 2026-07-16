@@ -39,4 +39,5 @@ async def ask_question(
         body.question,
         model_mode=body.model_mode,
         model_name=body.model_name,
+        history=body.history,
     )
