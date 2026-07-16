@@ -1,5 +1,7 @@
 import { ChangeEvent, useRef } from "react";
 import { DocumentItem } from "../api";
+import { DOC_UPLOAD } from "../explainers";
+import { Explainer } from "./Explainer";
 
 type Props = {
   documents: DocumentItem[];
@@ -35,6 +37,7 @@ export function DocumentPanel({ documents, busy, onUpload, onDelete }: Props) {
           onChange={handleChange}
         />
       </div>
+      <Explainer summary="What happens on upload">{DOC_UPLOAD}</Explainer>
       {documents.length === 0 ? (
         <p className="muted">Upload a PDF, TXT, or Markdown file to get started.</p>
       ) : (
