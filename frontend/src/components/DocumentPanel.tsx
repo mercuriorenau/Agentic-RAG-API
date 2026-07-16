@@ -1,5 +1,5 @@
-import { ChangeEvent, useRef } from "react";
-import { DocumentItem } from "../api";
+import { ChangeEvent, useEffect, useRef, useState } from "react";
+import { DocumentItem, fetchDocumentBlob } from "../api";
 import { DOC_UPLOAD } from "../explainers";
 import { Explainer } from "./Explainer";
 
@@ -10,8 +10,26 @@ type Props = {
   onDelete: (id: string) => Promise<void>;
 };
 
+type PreviewState = {
+  url: string;
+  filename: string;
+  contentType: string;
+  text?: string;
+};
+
 export function DocumentPanel({ documents, busy, onUpload, onDelete }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const [preview, setPreview] = useState<PreviewState | null>(null);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [previewBusy, setPreviewBusy] = useState(false);
+
+  useEffect(() => {
+    return () => {
+      if (preview?.url) {
+        URL.revokeObjectURL(preview.url);
+      }
+    };
+  }, [preview]);
 
   async function handleChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -20,6 +38,43 @@ export function DocumentPanel({ documents, busy, onUpload, onDelete }: Props) {
     }
     await onUpload(file);
     event.target.value = "";
+  }
+
+  async function handlePreview(doc: DocumentItem) {
+    setPreviewError(null);
+    setPreviewBusy(true);
+    try {
+      if (preview?.url) {
+        URL.revokeObjectURL(preview.url);
+      }
+      const { blob } = await fetchDocumentBlob(doc.id);
+      const url = URL.createObjectURL(blob);
+      let text: string | undefined;
+      if (
+        doc.content_type.startsWith("text/") ||
+        doc.filename.toLowerCase().endsWith(".md") ||
+        doc.filename.toLowerCase().endsWith(".txt")
+      ) {
+        text = await blob.text();
+      }
+      setPreview({
+        url,
+        filename: doc.filename,
+        contentType: doc.content_type || blob.type || "application/octet-stream",
+        text,
+      });
+    } catch (err) {
+      setPreviewError(err instanceof Error ? err.message : "Preview failed");
+    } finally {
+      setPreviewBusy(false);
+    }
+  }
+
+  function closePreview() {
+    if (preview?.url) {
+      URL.revokeObjectURL(preview.url);
+    }
+    setPreview(null);
   }
 
   return (
@@ -38,6 +93,7 @@ export function DocumentPanel({ documents, busy, onUpload, onDelete }: Props) {
         />
       </div>
       <Explainer summary="What happens on upload">{DOC_UPLOAD}</Explainer>
+      {previewError ? <p className="form-error">{previewError}</p> : null}
       {documents.length === 0 ? (
         <p className="muted">Upload a PDF, TXT, or Markdown file to get started.</p>
       ) : (
@@ -48,18 +104,46 @@ export function DocumentPanel({ documents, busy, onUpload, onDelete }: Props) {
                 <strong>{doc.filename}</strong>
                 <span className={`status ${doc.status}`}>{doc.status}</span>
               </div>
-              <button
-                type="button"
-                className="ghost danger"
-                disabled={busy}
-                onClick={() => onDelete(doc.id)}
-              >
-                Remove
-              </button>
+              <div className="doc-actions">
+                <button
+                  type="button"
+                  className="ghost"
+                  disabled={busy || previewBusy}
+                  onClick={() => handlePreview(doc)}
+                >
+                  Preview
+                </button>
+                <button
+                  type="button"
+                  className="ghost danger"
+                  disabled={busy}
+                  onClick={() => onDelete(doc.id)}
+                >
+                  Remove
+                </button>
+              </div>
             </li>
           ))}
         </ul>
       )}
+
+      {preview ? (
+        <div className="preview-overlay" role="dialog" aria-modal="true" aria-label="Document preview">
+          <div className="preview-modal">
+            <div className="preview-head">
+              <strong>{preview.filename}</strong>
+              <button type="button" className="ghost" onClick={closePreview}>
+                Close
+              </button>
+            </div>
+            {preview.text != null ? (
+              <pre className="preview-text">{preview.text}</pre>
+            ) : (
+              <iframe title={preview.filename} src={preview.url} className="preview-frame" />
+            )}
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }
