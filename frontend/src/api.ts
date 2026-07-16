@@ -24,6 +24,11 @@ export type ModelOption = {
   model_name?: string | null;
 };
 
+export type ConversationTurn = {
+  question: string;
+  answer: string;
+};
+
 export type QueryResponse = {
   answer: string;
   citations: Citation[];
@@ -36,6 +41,7 @@ export type QueryResponse = {
 };
 
 const TOKEN_KEY = "rag_access_token";
+const HISTORY_MAX_TURNS = 6;
 
 export function getToken(): string | null {
   return sessionStorage.getItem(TOKEN_KEY);
@@ -128,10 +134,23 @@ export async function listModels(): Promise<ModelOption[]> {
   return data.models;
 }
 
+export function historyFromTurns(
+  turnsNewestFirst: { question: string; response: QueryResponse }[],
+): ConversationTurn[] {
+  return [...turnsNewestFirst]
+    .reverse()
+    .slice(-HISTORY_MAX_TURNS)
+    .map((turn) => ({
+      question: turn.question,
+      answer: turn.response.answer,
+    }));
+}
+
 export async function askQuestion(
   question: string,
   modelMode: string,
   modelName?: string | null,
+  history: ConversationTurn[] = [],
 ): Promise<QueryResponse> {
   return request<QueryResponse>(
     "/api/v1/queries",
@@ -141,6 +160,7 @@ export async function askQuestion(
         question,
         model_mode: modelMode,
         model_name: modelName?.trim() || null,
+        history,
       }),
     },
     true,
