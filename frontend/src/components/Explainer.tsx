@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 type Props = {
   children: string;
   /** When set, render as a collapsible block with this summary label. */
@@ -5,17 +7,8 @@ type Props = {
   open?: boolean;
 };
 
-export function Explainer({ children, summary, open = false }: Props) {
-  if (summary) {
-    return (
-      <details className="explainer" open={open}>
-        <summary>{summary}</summary>
-        <p>{children}</p>
-      </details>
-    );
-  }
-
-  return <p className="explainer-inline">{children}</p>;
+export function Explainer({ children, summary }: Props) {
+  return <TechNote title={summary || "How this works"} paragraphs={[children]} />;
 }
 
 type MultiProps = {
@@ -24,13 +17,37 @@ type MultiProps = {
   open?: boolean;
 };
 
-export function AnswerExplainerBlock({ title, paragraphs, open = false }: MultiProps) {
+export function AnswerExplainerBlock({ title, paragraphs }: MultiProps) {
+  return <TechNote title={title} paragraphs={paragraphs} />;
+}
+
+type TechNoteProps = {
+  title: string;
+  paragraphs: string[];
+};
+
+function TechNote({ title, paragraphs }: TechNoteProps) {
+  const [open, setOpen] = useState(false);
+
   return (
-    <details className="explainer" open={open}>
-      <summary>{title}</summary>
-      {paragraphs.map((paragraph, index) => (
-        <p key={`${index}-${paragraph.slice(0, 24)}`}>{paragraph}</p>
-      ))}
-    </details>
+    <span className="tech-note">
+      <button
+        type="button"
+        className="tech-note-trigger"
+        aria-expanded={open}
+        aria-label={title}
+        onClick={() => setOpen((current) => !current)}
+      >
+        i
+      </button>
+      {open ? (
+        <span className="tech-note-popover" role="note">
+          <strong>{title}</strong>
+          {paragraphs.map((paragraph, index) => (
+            <span key={`${index}-${paragraph.slice(0, 24)}`}>{paragraph}</span>
+          ))}
+        </span>
+      ) : null}
+    </span>
   );
 }
