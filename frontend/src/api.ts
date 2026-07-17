@@ -8,8 +8,24 @@ export type Citation = {
   url?: string | null;
 };
 
+export type ChatItem = {
+  id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ChatMessage = {
+  id: string;
+  role: string;
+  content: string;
+  metadata?: Record<string, unknown> | null;
+  created_at: string;
+};
+
 export type DocumentItem = {
   id: string;
+  chat_id: string;
   filename: string;
   content_type: string;
   status: string;
@@ -110,13 +126,79 @@ export async function login(email: string, password: string): Promise<void> {
   setToken(data.access_token);
 }
 
-export async function listDocuments(): Promise<DocumentItem[]> {
-  const data = await request<{ documents: DocumentItem[] }>("/api/v1/documents", {}, true);
+export async function listChats(): Promise<ChatItem[]> {
+  const data = await request<{ chats: ChatItem[] }>("/api/v1/chats", {}, true);
+  return data.chats;
+}
+
+export async function createChat(title = "New chat"): Promise<ChatItem> {
+  return request<ChatItem>(
+    "/api/v1/chats",
+    { method: "POST", body: JSON.stringify({ title }) },
+    true,
+  );
+}
+
+export async function deleteChat(id: string): Promise<void> {
+  await request(`/api/v1/chats/${id}`, { method: "DELETE" }, true);
+}
+
+export async function listChatMessages(chatId: string): Promise<ChatMessage[]> {
+  const data = await request<{ messages: ChatMessage[] }>(
+    `/api/v1/chats/${chatId}/messages`,
+    {},
+    true,
+  );
+  return data.messages;
+}
+
+export async function clearChatMessages(chatId: string): Promise<void> {
+  await request(`/api/v1/chats/${chatId}/messages`, { method: "DELETE" }, true);
+}
+
+export function turnsFromMessages(
+  messages: ChatMessage[],
+): { question: string; response: QueryResponse }[] {
+  const turns: { question: string; response: QueryResponse }[] = [];
+  let pending: string | null = null;
+  for (const message of messages) {
+    if (message.role === "user") {
+      pending = message.content;
+      continue;
+    }
+    if (message.role === "assistant" && pending) {
+      const meta = (message.metadata || {}) as Partial<QueryResponse>;
+      turns.push({
+        question: pending,
+        response: {
+          answer: message.content,
+          citations: (meta.citations as Citation[]) || [],
+          tools_used: meta.tools_used || [],
+          route: meta.route || "direct",
+          model_mode: meta.model_mode || "auto",
+          model_provider: meta.model_provider || "openai",
+          model_name: meta.model_name || "",
+          model_selection_explanation: meta.model_selection_explanation || "",
+        },
+      });
+      pending = null;
+    }
+  }
+  return turns.reverse();
+}
+
+export async function listDocuments(chatId: string): Promise<DocumentItem[]> {
+  const data = await request<{ documents: DocumentItem[] }>(
+    `/api/v1/documents?chat_id=${encodeURIComponent(chatId)}`,
+    {},
+    true,
+  );
   return data.documents;
 }
 
-export async function uploadDocument(file: File): Promise<DocumentItem> {
+export async function uploadDocument(chatId: string, file: File): Promise<DocumentItem> {
   const form = new FormData();
+  form.append("chat_id", chatId);
   form.append("file", file);
   return request<DocumentItem>(
     "/api/v1/documents",
@@ -162,6 +244,7 @@ export function historyFromTurns(
 }
 
 export async function askQuestion(
+  chatId: string,
   question: string,
   modelMode: string,
   modelName?: string | null,
@@ -172,6 +255,7 @@ export async function askQuestion(
     {
       method: "POST",
       body: JSON.stringify({
+        chat_id: chatId,
         question,
         model_mode: modelMode,
         model_name: modelName?.trim() || null,

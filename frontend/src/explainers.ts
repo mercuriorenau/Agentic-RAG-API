@@ -4,7 +4,7 @@ import type { QueryResponse } from "./api";
 
 export const INTRO =
   "Sign in so your uploads stay under your account. The API uses JWT auth; " +
-  "each question only searches the documents you uploaded.";
+  "each chat only searches the documents you uploaded into that chat.";
 
 export const DOC_UPLOAD =
   "On upload we extract the text, split it into overlapping chunks, embed each " +
@@ -23,6 +23,10 @@ export const COST_GUARDRAIL =
 export const CONVERSATION_MEMORY =
   "Follow-ups use the last few Q&A turns, so pronouns like \"he\" or \"that resume\" " +
   "can refer to what you just discussed. Start a fresh question if you want a clean slate.";
+
+export const CHAT_SESSIONS =
+  "Each chat keeps its own documents and message history. Switch chats to isolate " +
+  "topics — a resume thread will not pull chunks from a policy thread.";
 
 export const CITATIONS =
   "Each card is a source the model actually saw — a document chunk or a web " +
