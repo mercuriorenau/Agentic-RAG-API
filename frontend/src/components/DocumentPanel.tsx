@@ -1,4 +1,5 @@
 import { ChangeEvent, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { DocumentItem, fetchDocumentBlob } from "../api";
 import { DOC_UPLOAD } from "../explainers";
 import { Explainer } from "./Explainer";
@@ -31,6 +32,21 @@ export function DocumentPanel({ documents, busy, onUpload, onDelete }: Props) {
     };
   }, [preview]);
 
+  useEffect(() => {
+    if (!preview) {
+      return;
+    }
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        closePreview();
+      }
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [preview]);
+
   async function handleChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) {
@@ -48,19 +64,24 @@ export function DocumentPanel({ documents, busy, onUpload, onDelete }: Props) {
         URL.revokeObjectURL(preview.url);
       }
       const { blob } = await fetchDocumentBlob(doc.id);
-      const url = URL.createObjectURL(blob);
+      const mime =
+        doc.content_type ||
+        blob.type ||
+        (doc.filename.toLowerCase().endsWith(".pdf") ? "application/pdf" : "application/octet-stream");
+      const typedBlob = blob.type === mime ? blob : new Blob([await blob.arrayBuffer()], { type: mime });
+      const url = URL.createObjectURL(typedBlob);
       let text: string | undefined;
       if (
-        doc.content_type.startsWith("text/") ||
+        mime.startsWith("text/") ||
         doc.filename.toLowerCase().endsWith(".md") ||
         doc.filename.toLowerCase().endsWith(".txt")
       ) {
-        text = await blob.text();
+        text = await typedBlob.text();
       }
       setPreview({
         url,
         filename: doc.filename,
-        contentType: doc.content_type || blob.type || "application/octet-stream",
+        contentType: mime,
         text,
       });
     } catch (err) {
@@ -71,10 +92,12 @@ export function DocumentPanel({ documents, busy, onUpload, onDelete }: Props) {
   }
 
   function closePreview() {
-    if (preview?.url) {
-      URL.revokeObjectURL(preview.url);
-    }
-    setPreview(null);
+    setPreview((current) => {
+      if (current?.url) {
+        URL.revokeObjectURL(current.url);
+      }
+      return null;
+    });
   }
 
   return (
@@ -135,23 +158,42 @@ export function DocumentPanel({ documents, busy, onUpload, onDelete }: Props) {
         </ul>
       )}
 
-      {preview ? (
-        <div className="preview-overlay" role="dialog" aria-modal="true" aria-label="Document preview">
-          <div className="preview-modal">
-            <div className="preview-head">
-              <strong>{preview.filename}</strong>
-              <button type="button" className="ghost" onClick={closePreview}>
-                Close
+      {preview
+        ? createPortal(
+            <div
+              className="preview-overlay"
+              role="dialog"
+              aria-modal="true"
+              aria-label={`Preview ${preview.filename}`}
+              onClick={closePreview}
+            >
+              <button
+                type="button"
+                className="preview-close"
+                aria-label="Close preview"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  closePreview();
+                }}
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path
+                    d="M6.2 6.2a1.1 1.1 0 0 1 1.55 0L12 10.45l4.25-4.25a1.1 1.1 0 1 1 1.55 1.55L13.55 12l4.25 4.25a1.1 1.1 0 1 1-1.55 1.55L12 13.55l-4.25 4.25a1.1 1.1 0 1 1-1.55-1.55L10.45 12 6.2 7.75a1.1 1.1 0 0 1 0-1.55Z"
+                    fill="currentColor"
+                  />
+                </svg>
               </button>
-            </div>
-            {preview.text != null ? (
-              <pre className="preview-text">{preview.text}</pre>
-            ) : (
-              <iframe title={preview.filename} src={preview.url} className="preview-frame" />
-            )}
-          </div>
-        </div>
-      ) : null}
+              <div className="preview-modal" onClick={(event) => event.stopPropagation()}>
+                {preview.text != null ? (
+                  <pre className="preview-text">{preview.text}</pre>
+                ) : (
+                  <iframe title={preview.filename} src={preview.url} className="preview-frame" />
+                )}
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
     </div>
   );
 }
