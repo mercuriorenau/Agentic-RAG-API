@@ -10,7 +10,13 @@ export const TOUR_STEPS: TourStep[] = [
     id: "intro",
     title: "Welcome to Agentic RAG",
     body:
-      "This app lets you create separate chats, upload documents into each one, and ask an agent that can retrieve, search the web, or answer directly.",
+      "This app lets you create separate chats, upload documents into each one, and ask an agent that can retrieve, search the web, or answer directly. Dashed info icons explain the technical pieces as you explore.",
+  },
+  {
+    id: "tour-launcher",
+    title: "Replay the tour",
+    body: "Use this corner control to replay the guide or simulate a first visit for demos.",
+    target: '[data-tour="tour-launcher"]',
   },
   {
     id: "sign-out",
