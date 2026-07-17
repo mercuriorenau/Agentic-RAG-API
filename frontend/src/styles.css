@@ -622,6 +622,122 @@ button.linkish.danger:hover:not(:disabled) {
   font-size: 0.85rem;
 }
 
+.tour-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  pointer-events: auto;
+}
+
+.tour-scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(26, 36, 33, 0.42);
+  backdrop-filter: blur(3px);
+}
+
+.tour-spotlight {
+  position: fixed;
+  z-index: 82;
+  border-radius: 18px;
+  box-shadow:
+    0 0 0 9999px rgba(26, 36, 33, 0.42),
+    0 18px 50px rgba(26, 36, 33, 0.18);
+  outline: 1px dashed rgba(244, 255, 252, 0.78);
+  pointer-events: none;
+  transition: top 180ms ease, left 180ms ease, width 180ms ease, height 180ms ease;
+}
+
+.tour-card {
+  position: fixed;
+  z-index: 83;
+  display: grid;
+  gap: 0.75rem;
+  padding: 1.1rem;
+  border-radius: 18px;
+  background: rgba(255, 252, 248, 0.96);
+  color: var(--ink);
+  box-shadow: 0 24px 70px rgba(26, 36, 33, 0.18);
+  animation: tour-card-in 220ms ease both;
+}
+
+.tour-card-intro {
+  top: 50%;
+  left: 50%;
+  width: min(28rem, calc(100vw - 2rem));
+  transform: translate(-50%, -50%);
+}
+
+.tour-card h2 {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 1.45rem;
+  line-height: 1.1;
+}
+
+.tour-card p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.tour-kicker {
+  width: fit-content;
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.tour-close {
+  position: absolute;
+  top: 0.45rem;
+  right: 0.45rem;
+  width: 1.8rem;
+  height: 1.8rem;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  color: var(--muted);
+  box-shadow: none;
+}
+
+.tour-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+@keyframes tour-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.tour-card-intro {
+  animation: tour-intro-in 360ms ease both;
+}
+
+@keyframes tour-intro-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, calc(-50% + 12px)) scale(0.96);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
 @media (max-width: 980px) {
   .grid,
   .workspace-grid {
