@@ -632,7 +632,10 @@ button.linkish.danger:hover:not(:disabled) {
 .tour-scrim {
   position: absolute;
   inset: 0;
-  background: rgba(26, 36, 33, 0.52);
+  z-index: 81;
+  background: rgba(26, 36, 33, 0.42);
+  backdrop-filter: blur(7px);
+  -webkit-backdrop-filter: blur(7px);
 }
 
 .tour-spotlight {
@@ -641,7 +644,6 @@ button.linkish.danger:hover:not(:disabled) {
   border-radius: 18px;
   background: transparent;
   box-shadow:
-    0 0 0 9999px rgba(26, 36, 33, 0.58),
     0 0 0 2px rgba(244, 255, 252, 0.95),
     0 0 28px 8px rgba(244, 255, 252, 0.55),
     0 0 48px 14px rgba(15, 107, 92, 0.35);
@@ -651,19 +653,17 @@ button.linkish.danger:hover:not(:disabled) {
 }
 
 .tour-target-active {
-  position: relative;
-  z-index: 84 !important;
-  filter: brightness(1.18) saturate(1.08) contrast(1.04);
+  filter: brightness(1.16) saturate(1.08) contrast(1.04);
   box-shadow:
     0 0 0 3px rgba(244, 255, 252, 0.95),
-    0 0 22px rgba(244, 255, 252, 0.7),
-    0 0 36px rgba(15, 107, 92, 0.4),
+    0 0 22px rgba(244, 255, 252, 0.65),
+    0 0 36px rgba(15, 107, 92, 0.35),
     var(--shadow-soft);
 }
 
 .tour-card {
   position: fixed;
-  z-index: 83;
+  z-index: 90;
   display: grid;
   gap: 0.75rem;
   padding: 1.1rem;
