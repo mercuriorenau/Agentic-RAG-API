@@ -1,17 +1,24 @@
 import { FormEvent, useEffect, useState } from "react";
 import {
   askQuestion,
+  ChatItem,
+  clearChatMessages,
   clearToken,
+  createChat,
+  deleteChat,
   deleteDocument,
   DocumentItem,
   getToken,
   historyFromTurns,
+  listChatMessages,
+  listChats,
   listDocuments,
   listModels,
   login,
   ModelOption,
   QueryResponse,
   register,
+  turnsFromMessages,
   uploadDocument,
 } from "./api";
 import { AuthForm } from "./components/AuthForm";
@@ -19,6 +26,7 @@ import { Citations } from "./components/Citations";
 import { DocumentPanel } from "./components/DocumentPanel";
 import { AnswerExplainerBlock, Explainer } from "./components/Explainer";
 import {
+  CHAT_SESSIONS,
   CONVERSATION_MEMORY,
   COST_GUARDRAIL,
   explainAnswer,
@@ -43,6 +51,8 @@ const FALLBACK_MODELS: ModelOption[] = [
 
 export default function App() {
   const [authed, setAuthed] = useState(Boolean(getToken()));
+  const [chats, setChats] = useState<ChatItem[]>([]);
+  const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
   const [question, setQuestion] = useState("");
   const [modelOptions, setModelOptions] = useState<ModelOption[]>(FALLBACK_MODELS);
@@ -51,9 +61,25 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function refreshDocuments() {
-    const docs = await listDocuments();
+  async function refreshChats(preferredId?: string | null) {
+    const items = await listChats();
+    setChats(items);
+    const nextId =
+      (preferredId && items.some((chat) => chat.id === preferredId) && preferredId) ||
+      (activeChatId && items.some((chat) => chat.id === activeChatId) && activeChatId) ||
+      items[0]?.id ||
+      null;
+    setActiveChatId(nextId);
+    return nextId;
+  }
+
+  async function loadChat(chatId: string) {
+    const [docs, messages] = await Promise.all([
+      listDocuments(chatId),
+      listChatMessages(chatId),
+    ]);
     setDocuments(docs);
+    setTurns(turnsFromMessages(messages));
   }
 
   async function refreshModels() {
@@ -72,8 +98,17 @@ export default function App() {
     if (!authed) {
       return;
     }
-    refreshDocuments().catch((err: Error) => setError(err.message));
+    refreshChats().catch((err: Error) => setError(err.message));
   }, [authed]);
+
+  useEffect(() => {
+    if (!authed || !activeChatId) {
+      setDocuments([]);
+      setTurns([]);
+      return;
+    }
+    loadChat(activeChatId).catch((err: Error) => setError(err.message));
+  }, [authed, activeChatId]);
 
   async function handleAuth(mode: "login" | "register", email: string, password: string) {
     setError(null);
@@ -94,17 +129,59 @@ export default function App() {
   function handleLogout() {
     clearToken();
     setAuthed(false);
+    setChats([]);
+    setActiveChatId(null);
     setDocuments([]);
     setTurns([]);
     setError(null);
   }
 
-  async function handleUpload(file: File) {
+  async function handleNewChat() {
     setError(null);
     setBusy(true);
     try {
-      await uploadDocument(file);
-      await refreshDocuments();
+      const chat = await createChat();
+      await refreshChats(chat.id);
+      setDocuments([]);
+      setTurns([]);
+      setQuestion("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not create chat");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleDeleteChat(chatId: string) {
+    setError(null);
+    setBusy(true);
+    try {
+      await deleteChat(chatId);
+      const nextId = await refreshChats(null);
+      if (nextId) {
+        await loadChat(nextId);
+      } else {
+        const created = await createChat();
+        await refreshChats(created.id);
+        setDocuments([]);
+        setTurns([]);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not delete chat");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleUpload(file: File) {
+    if (!activeChatId) {
+      return;
+    }
+    setError(null);
+    setBusy(true);
+    try {
+      await uploadDocument(activeChatId, file);
+      setDocuments(await listDocuments(activeChatId));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
     } finally {
@@ -113,13 +190,32 @@ export default function App() {
   }
 
   async function handleDelete(id: string) {
+    if (!activeChatId) {
+      return;
+    }
     setError(null);
     setBusy(true);
     try {
       await deleteDocument(id);
-      await refreshDocuments();
+      setDocuments(await listDocuments(activeChatId));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Delete failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleClearMemory() {
+    if (!activeChatId) {
+      return;
+    }
+    setError(null);
+    setBusy(true);
+    try {
+      await clearChatMessages(activeChatId);
+      setTurns([]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not clear chat memory");
     } finally {
       setBusy(false);
     }
@@ -128,7 +224,7 @@ export default function App() {
   async function handleAsk(event: FormEvent) {
     event.preventDefault();
     const trimmed = question.trim();
-    if (!trimmed) {
+    if (!trimmed || !activeChatId) {
       return;
     }
     const selected =
@@ -138,6 +234,7 @@ export default function App() {
     try {
       const history = historyFromTurns(turns);
       const response = await askQuestion(
+        activeChatId,
         trimmed,
         selected.mode,
         selected.model_name,
@@ -145,6 +242,8 @@ export default function App() {
       );
       setTurns((prev) => [{ question: trimmed, response }, ...prev]);
       setQuestion("");
+      const items = await listChats();
+      setChats(items);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Query failed");
     } finally {
@@ -174,7 +273,7 @@ export default function App() {
       <header className="topbar">
         <div>
           <p className="brand">Agentic RAG</p>
-          <p className="muted">Documents, agent routing, and cited answers</p>
+          <p className="muted">Separate chats, each with its own documents</p>
         </div>
         <button type="button" className="ghost" onClick={handleLogout}>
           Sign out
@@ -183,10 +282,46 @@ export default function App() {
 
       {error ? <div className="banner error">{error}</div> : null}
 
-      <div className="grid">
+      <div className="workspace-grid">
+        <aside className="panel chats-panel">
+          <div className="panel-head">
+            <h2>Chats</h2>
+            <button type="button" className="ghost" disabled={busy} onClick={handleNewChat}>
+              New
+            </button>
+          </div>
+          <Explainer summary="Why separate chats">{CHAT_SESSIONS}</Explainer>
+          {chats.length === 0 ? (
+            <p className="muted">Create a chat to upload documents and ask questions.</p>
+          ) : (
+            <ul className="chat-list">
+              {chats.map((chat) => (
+                <li key={chat.id} className={chat.id === activeChatId ? "active" : undefined}>
+                  <button
+                    type="button"
+                    className="chat-select"
+                    disabled={busy}
+                    onClick={() => setActiveChatId(chat.id)}
+                  >
+                    {chat.title}
+                  </button>
+                  <button
+                    type="button"
+                    className="ghost danger"
+                    disabled={busy}
+                    onClick={() => handleDeleteChat(chat.id)}
+                  >
+                    Delete
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </aside>
+
         <DocumentPanel
           documents={documents}
-          busy={busy}
+          busy={busy || !activeChatId}
           onUpload={handleUpload}
           onDelete={handleDelete}
         />
@@ -200,8 +335,8 @@ export default function App() {
               <button
                 type="button"
                 className="ghost"
-                disabled={busy || turns.length === 0}
-                onClick={() => setTurns([])}
+                disabled={busy || turns.length === 0 || !activeChatId}
+                onClick={handleClearMemory}
               >
                 Clear chat memory
               </button>
@@ -226,9 +361,9 @@ export default function App() {
               onChange={(event) => setQuestion(event.target.value)}
               placeholder="What does the refund policy say?"
               rows={4}
-              disabled={busy}
+              disabled={busy || !activeChatId}
             />
-            <button type="submit" disabled={busy || !question.trim()}>
+            <button type="submit" disabled={busy || !question.trim() || !activeChatId}>
               {busy ? "Working…" : "Ask"}
             </button>
           </form>
