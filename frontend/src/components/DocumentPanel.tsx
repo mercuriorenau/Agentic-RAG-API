@@ -78,10 +78,15 @@ export function DocumentPanel({ documents, busy, onUpload, onDelete }: Props) {
   }
 
   return (
-    <section className="panel docs-panel">
-      <div className="panel-head">
-        <h2>Documents</h2>
-        <button type="button" disabled={busy} onClick={() => inputRef.current?.click()}>
+    <div className="chat-docs">
+      <div className="chat-docs-head">
+        <span className="chat-docs-label">Documents</span>
+        <button
+          type="button"
+          className="linkish"
+          disabled={busy}
+          onClick={() => inputRef.current?.click()}
+        >
           Upload
         </button>
         <input
@@ -95,19 +100,19 @@ export function DocumentPanel({ documents, busy, onUpload, onDelete }: Props) {
       <Explainer summary="What happens on upload">{DOC_UPLOAD}</Explainer>
       {previewError ? <p className="form-error">{previewError}</p> : null}
       {documents.length === 0 ? (
-        <p className="muted">Upload a PDF, TXT, or Markdown file to get started.</p>
+        <p className="muted compact-muted">No files in this chat yet.</p>
       ) : (
-        <ul className="doc-list">
+        <ul className="doc-list nested">
           {documents.map((doc) => (
             <li key={doc.id}>
-              <div>
-                <strong>{doc.filename}</strong>
+              <div className="doc-meta">
+                <strong title={doc.filename}>{doc.filename}</strong>
                 <span className={`status ${doc.status}`}>{doc.status}</span>
               </div>
               <div className="doc-actions">
                 <button
                   type="button"
-                  className="ghost"
+                  className="linkish"
                   disabled={busy || previewBusy}
                   onClick={() => handlePreview(doc)}
                 >
@@ -115,7 +120,7 @@ export function DocumentPanel({ documents, busy, onUpload, onDelete }: Props) {
                 </button>
                 <button
                   type="button"
-                  className="ghost danger"
+                  className="linkish danger"
                   disabled={busy}
                   onClick={() => onDelete(doc.id)}
                 >
@@ -144,6 +149,6 @@ export function DocumentPanel({ documents, busy, onUpload, onDelete }: Props) {
           </div>
         </div>
       ) : null}
-    </section>
+    </div>
   );
 }

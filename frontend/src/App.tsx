@@ -295,36 +295,42 @@ export default function App() {
             <p className="muted">Create a chat to upload documents and ask questions.</p>
           ) : (
             <ul className="chat-list">
-              {chats.map((chat) => (
-                <li key={chat.id} className={chat.id === activeChatId ? "active" : undefined}>
-                  <button
-                    type="button"
-                    className="chat-select"
-                    disabled={busy}
-                    onClick={() => setActiveChatId(chat.id)}
-                  >
-                    {chat.title}
-                  </button>
-                  <button
-                    type="button"
-                    className="ghost danger"
-                    disabled={busy}
-                    onClick={() => handleDeleteChat(chat.id)}
-                  >
-                    Delete
-                  </button>
-                </li>
-              ))}
+              {chats.map((chat) => {
+                const isActive = chat.id === activeChatId;
+                return (
+                  <li key={chat.id} className={isActive ? "active chat-block" : "chat-block"}>
+                    <div className="chat-row">
+                      <button
+                        type="button"
+                        className="chat-select"
+                        disabled={busy}
+                        onClick={() => setActiveChatId(chat.id)}
+                      >
+                        {chat.title}
+                      </button>
+                      <button
+                        type="button"
+                        className="linkish danger"
+                        disabled={busy}
+                        onClick={() => handleDeleteChat(chat.id)}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                    {isActive ? (
+                      <DocumentPanel
+                        documents={documents}
+                        busy={busy || !activeChatId}
+                        onUpload={handleUpload}
+                        onDelete={handleDelete}
+                      />
+                    ) : null}
+                  </li>
+                );
+              })}
             </ul>
           )}
         </aside>
-
-        <DocumentPanel
-          documents={documents}
-          busy={busy || !activeChatId}
-          onUpload={handleUpload}
-          onDelete={handleDelete}
-        />
 
         <section className="panel ask-panel">
           <h2>Ask</h2>
