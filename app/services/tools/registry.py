@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from typing import Any
+from uuid import UUID
 
 from app.models import User
 from app.schemas.query import Citation
@@ -12,6 +13,7 @@ from app.services.tools.web_search import web_search
 class ToolContext:
     user: User
     rag_service: RAGService
+    chat_id: UUID | None = None
     tavily_api_key: str = ""
 
 
@@ -96,7 +98,11 @@ async def _retrieve_documents(arguments: dict[str, Any], context: ToolContext) -
     if not query:
         return ToolResult(content="retrieve_documents requires a non-empty query.")
 
-    retrieved = await context.rag_service.retrieve(context.user, query)
+    retrieved = await context.rag_service.retrieve(
+        context.user,
+        query,
+        chat_id=context.chat_id,
+    )
     if not retrieved:
         return ToolResult(content="No relevant passages found in uploaded documents.")
 

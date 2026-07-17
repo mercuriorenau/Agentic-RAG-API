@@ -1,3 +1,5 @@
+import uuid
+
 from app.core.config import Settings, get_settings
 from app.core.logging import get_logger
 from app.models import User
@@ -59,6 +61,7 @@ class AgentService:
         user: User,
         question: str,
         *,
+        chat_id: uuid.UUID | None = None,
         model_mode: str = "auto",
         model_name: str | None = None,
         history: list[ConversationTurn] | None = None,
@@ -86,6 +89,7 @@ class AgentService:
         context = ToolContext(
             user=user,
             rag_service=self.rag_service,
+            chat_id=chat_id,
             tavily_api_key=self.settings.tavily_api_key,
         )
 
