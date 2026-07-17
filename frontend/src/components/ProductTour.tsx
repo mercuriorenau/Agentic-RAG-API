@@ -33,12 +33,19 @@ export function ProductTour({ active, onClose, onComplete }: Props) {
       return;
     }
 
+    let currentTarget: HTMLElement | null = null;
+
     function measure() {
       const element = document.querySelector<HTMLElement>(step.target || "");
+      if (currentTarget && currentTarget !== element) {
+        currentTarget.classList.remove("tour-target-active");
+      }
+      currentTarget = element;
       if (!element) {
         setTargetRect(null);
         return;
       }
+      element.classList.add("tour-target-active");
       const rect = element.getBoundingClientRect();
       setTargetRect({
         top: rect.top,
@@ -54,6 +61,7 @@ export function ProductTour({ active, onClose, onComplete }: Props) {
     return () => {
       window.removeEventListener("resize", measure);
       window.removeEventListener("scroll", measure, true);
+      currentTarget?.classList.remove("tour-target-active");
     };
   }, [active, step]);
 
@@ -99,7 +107,7 @@ export function ProductTour({ active, onClose, onComplete }: Props) {
 
   return (
     <div className="tour-layer" role="dialog" aria-modal="true" aria-label="Product tour">
-      <div className="tour-scrim" />
+      {isIntro || !targetRect ? <div className="tour-scrim" /> : null}
       {targetRect && !isIntro ? <Spotlight rect={targetRect} /> : null}
       <TourCard
         step={step}
@@ -116,7 +124,7 @@ export function ProductTour({ active, onClose, onComplete }: Props) {
 }
 
 function Spotlight({ rect }: { rect: Rect }) {
-  const pad = 8;
+  const pad = 10;
   return (
     <div
       className="tour-spotlight"
