@@ -56,17 +56,23 @@ Deploy your own instance to Railway (see below) or run locally with Docker Compo
 | POST | `/api/v1/auth/register` | No | Create account |
 | POST | `/api/v1/auth/login` | No | Get JWT |
 | GET | `/api/v1/models` | No | List available model choices |
-| POST | `/api/v1/documents` | JWT | Upload document |
-| GET | `/api/v1/documents` | JWT | List documents |
+| GET | `/api/v1/chats` | JWT | List chat sessions (creates one if empty) |
+| POST | `/api/v1/chats` | JWT | Create a chat session |
+| PATCH | `/api/v1/chats/{id}` | JWT | Rename a chat |
+| DELETE | `/api/v1/chats/{id}` | JWT | Delete a chat and its documents |
+| GET | `/api/v1/chats/{id}/messages` | JWT | List messages in a chat |
+| DELETE | `/api/v1/chats/{id}/messages` | JWT | Clear chat message history |
+| POST | `/api/v1/documents` | JWT | Upload document (requires `chat_id` form field) |
+| GET | `/api/v1/documents` | JWT | List documents for a chat (`?chat_id=`) |
 | GET | `/api/v1/documents/{id}/file` | JWT | Preview / download original file |
 | DELETE | `/api/v1/documents/{id}` | JWT | Delete document |
-| POST | `/api/v1/queries` | JWT | Ask a question (agent) |
+| POST | `/api/v1/queries` | JWT | Ask a question (agent; requires `chat_id`) |
 
 Interactive docs: `http://localhost:8000/docs`
 
 Query response includes `answer`, `citations`, `tools_used`, `route`, `model_provider`, `model_name`, and `model_selection_explanation`.
 
-`POST /api/v1/queries` accepts optional `history` (prior question/answer turns) so follow-ups like “is he a good hire?” resolve against the conversation, not only the latest sentence.
+Each chat owns its own documents and message history. Retrieval only searches documents attached to the `chat_id` on the query. `POST /api/v1/queries` also accepts optional `history` (prior question/answer turns); if omitted, the server loads recent turns from that chat.
 
 Available models are exposed at `GET /api/v1/models`. The UI dropdown only shows providers whose API keys are configured.
 
