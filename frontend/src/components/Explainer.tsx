@@ -30,7 +30,7 @@ function TechNote({ title, paragraphs }: TechNoteProps) {
   const [open, setOpen] = useState(false);
 
   return (
-    <span className="tech-note">
+    <span className="tech-note" data-tour="tech-note">
       <button
         type="button"
         className="tech-note-trigger"

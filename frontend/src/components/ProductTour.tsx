@@ -151,8 +151,10 @@ function TourCard({
   onNext,
   onPrevious,
 }: CardProps) {
+  const className = isIntro || !style ? "tour-card tour-card-intro" : "tour-card";
+
   return (
-    <section className={isIntro ? "tour-card tour-card-intro" : "tour-card"} style={style}>
+    <section className={className} style={style}>
       <button type="button" className="tour-close" aria-label="Close tour" onClick={onClose}>
         x
       </button>

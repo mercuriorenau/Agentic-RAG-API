@@ -710,6 +710,42 @@ button.linkish.danger:hover:not(:disabled) {
   gap: 0.5rem;
 }
 
+.tour-launcher {
+  position: fixed;
+  left: 1rem;
+  bottom: 1rem;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.35rem;
+  border-radius: 999px;
+  background: rgba(255, 252, 248, 0.55);
+  box-shadow: var(--shadow-soft), var(--shadow-inset);
+  backdrop-filter: blur(10px);
+}
+
+.tour-launcher-main,
+.tour-launcher-secondary {
+  box-shadow: none;
+}
+
+.tour-launcher-main {
+  padding: 0.45rem 0.8rem;
+}
+
+.tour-launcher-secondary {
+  background: transparent;
+  color: var(--muted);
+  padding: 0.45rem 0.7rem;
+  font-size: 0.82rem;
+}
+
+.tour-launcher-secondary:hover {
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.35);
+}
+
 @keyframes tour-card-in {
   from {
     opacity: 0;
@@ -746,5 +782,11 @@ button.linkish.danger:hover:not(:disabled) {
 
   .topbar {
     flex-direction: column;
+  }
+
+  .tour-launcher {
+    right: 1rem;
+    width: calc(100% - 2rem);
+    justify-content: space-between;
   }
 }

@@ -84,6 +84,7 @@ export function DocumentPanel({ documents, busy, onUpload, onDelete }: Props) {
         <button
           type="button"
           className="linkish"
+          data-tour="upload-doc"
           disabled={busy}
           onClick={() => inputRef.current?.click()}
         >
@@ -113,6 +114,7 @@ export function DocumentPanel({ documents, busy, onUpload, onDelete }: Props) {
                 <button
                   type="button"
                   className="linkish"
+                  data-tour="preview-doc"
                   disabled={busy || previewBusy}
                   onClick={() => handlePreview(doc)}
                 >
@@ -121,6 +123,7 @@ export function DocumentPanel({ documents, busy, onUpload, onDelete }: Props) {
                 <button
                   type="button"
                   className="linkish danger"
+                  data-tour="remove-doc"
                   disabled={busy}
                   onClick={() => onDelete(doc.id)}
                 >

@@ -57,6 +57,7 @@ export type QueryResponse = {
 };
 
 const TOKEN_KEY = "rag_access_token";
+const USER_EMAIL_KEY = "rag_user_email";
 const HISTORY_MAX_TURNS = 6;
 
 export function getToken(): string | null {
@@ -69,6 +70,15 @@ export function setToken(token: string): void {
 
 export function clearToken(): void {
   sessionStorage.removeItem(TOKEN_KEY);
+  sessionStorage.removeItem(USER_EMAIL_KEY);
+}
+
+export function getUserKey(): string | null {
+  return sessionStorage.getItem(USER_EMAIL_KEY);
+}
+
+function setUserKey(email: string): void {
+  sessionStorage.setItem(USER_EMAIL_KEY, email.toLowerCase());
 }
 
 async function request<T>(
@@ -124,6 +134,7 @@ export async function login(email: string, password: string): Promise<void> {
     body: JSON.stringify({ email, password }),
   });
   setToken(data.access_token);
+  setUserKey(email);
 }
 
 export async function listChats(): Promise<ChatItem[]> {

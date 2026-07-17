@@ -9,6 +9,7 @@ import {
   deleteDocument,
   DocumentItem,
   getToken,
+  getUserKey,
   historyFromTurns,
   listChatMessages,
   listChats,
@@ -25,6 +26,8 @@ import { AuthForm } from "./components/AuthForm";
 import { Citations } from "./components/Citations";
 import { DocumentPanel } from "./components/DocumentPanel";
 import { AnswerExplainerBlock, Explainer } from "./components/Explainer";
+import { ProductTour } from "./components/ProductTour";
+import { TourLauncher } from "./components/TourLauncher";
 import {
   CHAT_SESSIONS,
   CONVERSATION_MEMORY,
@@ -33,6 +36,7 @@ import {
   INTRO,
   MODEL_PICKER,
 } from "./explainers";
+import { clearTourComplete, hasCompletedTour, markTourComplete } from "./tour/tourStorage";
 
 type ChatTurn = {
   question: string;
@@ -60,6 +64,8 @@ export default function App() {
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [userKey, setUserKey] = useState(getUserKey());
+  const [tourActive, setTourActive] = useState(false);
 
   async function refreshChats(preferredId?: string | null) {
     const items = await listChats();
@@ -102,6 +108,13 @@ export default function App() {
   }, [authed]);
 
   useEffect(() => {
+    if (!authed || !userKey || hasCompletedTour(userKey)) {
+      return;
+    }
+    setTourActive(true);
+  }, [authed, userKey]);
+
+  useEffect(() => {
     if (!authed || !activeChatId) {
       setDocuments([]);
       setTurns([]);
@@ -118,6 +131,7 @@ export default function App() {
         await register(email, password);
       }
       await login(email, password);
+      setUserKey(email.toLowerCase());
       setAuthed(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Authentication failed");
@@ -129,6 +143,8 @@ export default function App() {
   function handleLogout() {
     clearToken();
     setAuthed(false);
+    setUserKey(null);
+    setTourActive(false);
     setChats([]);
     setActiveChatId(null);
     setDocuments([]);
@@ -251,6 +267,25 @@ export default function App() {
     }
   }
 
+  function handleTourClose() {
+    markTourComplete(userKey);
+    setTourActive(false);
+  }
+
+  function handleTourComplete() {
+    markTourComplete(userKey);
+    setTourActive(false);
+  }
+
+  function handleStartTour() {
+    setTourActive(true);
+  }
+
+  function handleSimulateFirstVisit() {
+    clearTourComplete(userKey);
+    setTourActive(true);
+  }
+
   if (!authed) {
     return (
       <div className="shell">
@@ -275,7 +310,7 @@ export default function App() {
           <p className="brand">Agentic RAG</p>
           <p className="muted">Separate chats, each with its own documents</p>
         </div>
-        <button type="button" className="ghost" onClick={handleLogout}>
+        <button type="button" className="ghost" data-tour="sign-out" onClick={handleLogout}>
           Sign out
         </button>
       </header>
@@ -286,7 +321,13 @@ export default function App() {
         <aside className="panel chats-panel">
           <div className="panel-head">
             <h2>Chats</h2>
-            <button type="button" className="ghost" disabled={busy} onClick={handleNewChat}>
+            <button
+              type="button"
+              className="ghost"
+              data-tour="new-chat"
+              disabled={busy}
+              onClick={handleNewChat}
+            >
               New
             </button>
           </div>
@@ -303,6 +344,7 @@ export default function App() {
                       <button
                         type="button"
                         className="chat-select"
+                        data-tour={isActive ? "chat-select" : undefined}
                         disabled={busy}
                         onClick={() => setActiveChatId(chat.id)}
                       >
@@ -311,6 +353,7 @@ export default function App() {
                       <button
                         type="button"
                         className="linkish danger"
+                        data-tour={isActive ? "delete-chat" : undefined}
                         disabled={busy}
                         onClick={() => handleDeleteChat(chat.id)}
                       >
@@ -341,13 +384,14 @@ export default function App() {
               <button
                 type="button"
                 className="ghost"
+                data-tour="clear-memory"
                 disabled={busy || turns.length === 0 || !activeChatId}
                 onClick={handleClearMemory}
               >
                 Clear chat memory
               </button>
             </div>
-            <label className="compact-label">
+            <label className="compact-label" data-tour="model-picker">
               Model
               <select
                 value={selectedModelId}
@@ -363,18 +407,23 @@ export default function App() {
             </label>
             <Explainer summary="Why the model picker matters">{MODEL_PICKER}</Explainer>
             <textarea
+              data-tour="question"
               value={question}
               onChange={(event) => setQuestion(event.target.value)}
               placeholder="What does the refund policy say?"
               rows={4}
               disabled={busy || !activeChatId}
             />
-            <button type="submit" disabled={busy || !question.trim() || !activeChatId}>
+            <button
+              type="submit"
+              data-tour="ask-button"
+              disabled={busy || !question.trim() || !activeChatId}
+            >
               {busy ? "Working…" : "Ask"}
             </button>
           </form>
 
-          <div className="turns">
+          <div className="turns" data-tour="turns">
             {turns.length === 0 ? (
               <p className="muted">
                 Answers appear here with route, model, citations, and a short walkthrough of
@@ -411,6 +460,15 @@ export default function App() {
           </div>
         </section>
       </div>
+      <TourLauncher
+        onStart={handleStartTour}
+        onSimulateFirstVisit={handleSimulateFirstVisit}
+      />
+      <ProductTour
+        active={tourActive}
+        onClose={handleTourClose}
+        onComplete={handleTourComplete}
+      />
     </div>
   );
 }
