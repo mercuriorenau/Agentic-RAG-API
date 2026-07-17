@@ -15,6 +15,9 @@ type Rect = {
   height: number;
 };
 
+const SPOTLIGHT_PAD = 10;
+const SPOTLIGHT_RADIUS = 14;
+
 export function ProductTour({ active, onClose, onComplete }: Props) {
   const [index, setIndex] = useState(0);
   const [targetRect, setTargetRect] = useState<Rect | null>(null);
@@ -72,17 +75,34 @@ export function ProductTour({ active, onClose, onComplete }: Props) {
 
     const gap = 16;
     const cardWidth = Math.min(360, window.innerWidth - 32);
-    const prefersRight = targetRect.left + targetRect.width + cardWidth + gap < window.innerWidth;
-    const left = prefersRight
-      ? targetRect.left + targetRect.width + gap
-      : Math.max(16, Math.min(targetRect.left, window.innerWidth - cardWidth - 16));
-    const top = Math.max(16, Math.min(targetRect.top, window.innerHeight - 260));
+    const spaceRight = window.innerWidth - (targetRect.left + targetRect.width + gap);
+    const spaceLeft = targetRect.left - gap;
+    let left: number;
+    if (spaceRight >= cardWidth) {
+      left = targetRect.left + targetRect.width + gap;
+    } else if (spaceLeft >= cardWidth) {
+      left = targetRect.left - cardWidth - gap;
+    } else {
+      left = Math.max(16, Math.min(targetRect.left, window.innerWidth - cardWidth - 16));
+    }
+
+    const preferBelow = targetRect.top < 120;
+    const top = preferBelow
+      ? Math.min(targetRect.top + targetRect.height + gap, window.innerHeight - 260)
+      : Math.max(16, Math.min(targetRect.top, window.innerHeight - 260));
 
     return {
       left,
-      top,
+      top: Math.max(16, top),
       width: cardWidth,
     };
+  }, [isIntro, targetRect]);
+
+  const scrimStyle = useMemo(() => {
+    if (!targetRect || isIntro) {
+      return undefined;
+    }
+    return { clipPath: holeClipPath(targetRect, SPOTLIGHT_PAD) };
   }, [isIntro, targetRect]);
 
   if (!active || !step) {
@@ -107,7 +127,7 @@ export function ProductTour({ active, onClose, onComplete }: Props) {
 
   return (
     <div className="tour-layer" role="dialog" aria-modal="true" aria-label="Product tour">
-      {isIntro || !targetRect ? <div className="tour-scrim" /> : null}
+      <div className="tour-scrim" style={scrimStyle} />
       {targetRect && !isIntro ? <Spotlight rect={targetRect} /> : null}
       <TourCard
         step={step}
@@ -123,16 +143,41 @@ export function ProductTour({ active, onClose, onComplete }: Props) {
   );
 }
 
+function holeClipPath(rect: Rect, pad: number): string {
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const top = Math.max(0, rect.top - pad);
+  const left = Math.max(0, rect.left - pad);
+  const right = Math.min(vw, rect.left + rect.width + pad);
+  const bottom = Math.min(vh, rect.top + rect.height + pad);
+  const r = Math.min(SPOTLIGHT_RADIUS, (right - left) / 2, (bottom - top) / 2);
+
+  const outer = `M0 0 H${vw} V${vh} H0 Z`;
+  const hole = [
+    `M${left + r} ${top}`,
+    `H${right - r}`,
+    `A${r} ${r} 0 0 1 ${right} ${top + r}`,
+    `V${bottom - r}`,
+    `A${r} ${r} 0 0 1 ${right - r} ${bottom}`,
+    `H${left + r}`,
+    `A${r} ${r} 0 0 1 ${left} ${bottom - r}`,
+    `V${top + r}`,
+    `A${r} ${r} 0 0 1 ${left + r} ${top}`,
+    "Z",
+  ].join(" ");
+
+  return `path(evenodd, "${outer} ${hole}")`;
+}
+
 function Spotlight({ rect }: { rect: Rect }) {
-  const pad = 10;
   return (
     <div
       className="tour-spotlight"
       style={{
-        top: rect.top - pad,
-        left: rect.left - pad,
-        width: rect.width + pad * 2,
-        height: rect.height + pad * 2,
+        top: rect.top - SPOTLIGHT_PAD,
+        left: rect.left - SPOTLIGHT_PAD,
+        width: rect.width + SPOTLIGHT_PAD * 2,
+        height: rect.height + SPOTLIGHT_PAD * 2,
       }}
     />
   );
@@ -164,7 +209,7 @@ function TourCard({
   return (
     <section className={className} style={style}>
       <button type="button" className="tour-close" aria-label="Close tour" onClick={onClose}>
-        x
+        ×
       </button>
       <span className="tour-kicker">{isIntro ? "Start here" : `Step ${index + 1} of ${total}`}</span>
       <h2>{step.title}</h2>
