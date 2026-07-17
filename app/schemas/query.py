@@ -11,6 +11,7 @@ class QueryRequest(BaseModel):
         min_length=1,
         description="User question. The API enforces MAX_QUERY_LENGTH before calling the LLM.",
     )
+    chat_id: str = Field(description="Chat session that owns documents and conversation history.")
     model_mode: str = Field(
         default="auto",
         description="Model selection mode: auto, openai, or anthropic.",

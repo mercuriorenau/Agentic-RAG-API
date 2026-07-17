@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings, get_settings
 from app.core.logging import get_logger
-from app.models import Chunk, Document, User
+from app.models import Chat, Chunk, Document, User
 from app.services.embedding_service import EmbeddingService
 from app.utils.extractors import UnsupportedFileTypeError, chunk_text, extract_text
 
@@ -33,9 +33,20 @@ class DocumentService:
         self.upload_dir = Path(self.settings.upload_dir)
         self.upload_dir.mkdir(parents=True, exist_ok=True)
 
-    async def list_documents(self, user: User) -> list[Document]:
+    async def _get_owned_chat(self, user: User, chat_id: uuid.UUID) -> Chat | None:
         result = await self.db.execute(
-            select(Document).where(Document.user_id == user.id).order_by(Document.created_at.desc())
+            select(Chat).where(Chat.id == chat_id, Chat.user_id == user.id)
+        )
+        return result.scalar_one_or_none()
+
+    async def list_documents(self, user: User, chat_id: uuid.UUID) -> list[Document] | None:
+        chat = await self._get_owned_chat(user, chat_id)
+        if chat is None:
+            return None
+        result = await self.db.execute(
+            select(Document)
+            .where(Document.user_id == user.id, Document.chat_id == chat_id)
+            .order_by(Document.created_at.desc())
         )
         return list(result.scalars().all())
 
@@ -48,10 +59,15 @@ class DocumentService:
     async def upload_and_ingest(
         self,
         user: User,
+        chat_id: uuid.UUID,
         filename: str,
         content_type: str,
         file_bytes: bytes,
     ) -> Document:
+        chat = await self._get_owned_chat(user, chat_id)
+        if chat is None:
+            raise LookupError("Chat not found")
+
         suffix = Path(filename).suffix.lower()
         if suffix not in ALLOWED_EXTENSIONS and content_type not in ALLOWED_CONTENT_TYPES:
             raise UnsupportedFileTypeError("Only PDF, TXT, and Markdown files are supported")
@@ -65,6 +81,7 @@ class DocumentService:
         document = Document(
             id=document_id,
             user_id=user.id,
+            chat_id=chat.id,
             filename=filename,
             content_type=content_type,
             file_path=str(file_path),
@@ -96,6 +113,7 @@ class DocumentService:
                 "document_ingested",
                 document_id=str(document.id),
                 user_id=str(user.id),
+                chat_id=str(chat.id),
                 chunk_count=len(chunks),
             )
         except Exception:

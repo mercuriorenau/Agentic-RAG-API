@@ -1,3 +1,4 @@
+import uuid
 from dataclasses import dataclass
 
 from sqlalchemy import select
@@ -28,22 +29,36 @@ class RAGService:
         self.settings = settings or get_settings()
         self.embedding_service = embedding_service or EmbeddingService(self.settings)
 
-    async def retrieve(self, user: User, question: str) -> list[RetrievedChunk]:
+    async def retrieve(
+        self,
+        user: User,
+        question: str,
+        *,
+        chat_id: uuid.UUID | None = None,
+    ) -> list[RetrievedChunk]:
         query_embedding = await self.embedding_service.embed_query(question)
-        return await self._retrieve_chunks(user, query_embedding)
+        return await self._retrieve_chunks(user, query_embedding, chat_id=chat_id)
 
     async def _retrieve_chunks(
-        self, user: User, query_embedding: list[float]
+        self,
+        user: User,
+        query_embedding: list[float],
+        *,
+        chat_id: uuid.UUID | None = None,
     ) -> list[RetrievedChunk]:
         distance = Chunk.embedding.cosine_distance(query_embedding)
+        filters = [
+            Document.user_id == user.id,
+            Document.status == "ready",
+            Chunk.embedding.is_not(None),
+        ]
+        if chat_id is not None:
+            filters.append(Document.chat_id == chat_id)
+
         stmt = (
             select(Chunk, Document, distance.label("distance"))
             .join(Document, Chunk.document_id == Document.id)
-            .where(
-                Document.user_id == user.id,
-                Document.status == "ready",
-                Chunk.embedding.is_not(None),
-            )
+            .where(*filters)
             .order_by(distance)
             .limit(self.settings.top_k)
         )

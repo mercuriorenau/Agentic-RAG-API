@@ -1,7 +1,7 @@
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,6 +19,7 @@ router = APIRouter(prefix="/documents", tags=["documents"])
 def _to_response(document) -> DocumentResponse:
     return DocumentResponse(
         id=str(document.id),
+        chat_id=str(document.chat_id),
         filename=document.filename,
         content_type=document.content_type,
         status=document.status,
@@ -32,6 +33,7 @@ async def get_document_service(db: AsyncSession = Depends(get_db)) -> DocumentSe
 
 @router.post("", response_model=DocumentResponse, status_code=201)
 async def upload_document(
+    chat_id: uuid.UUID = Form(...),
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
     document_service: DocumentService = Depends(get_document_service),
@@ -51,8 +53,10 @@ async def upload_document(
 
     try:
         document = await document_service.upload_and_ingest(
-            current_user, filename, content_type, file_bytes
+            current_user, chat_id, filename, content_type, file_bytes
         )
+    except LookupError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except UnsupportedFileTypeError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except ValueError as exc:
@@ -63,10 +67,13 @@ async def upload_document(
 
 @router.get("", response_model=DocumentListResponse)
 async def list_documents(
+    chat_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
     document_service: DocumentService = Depends(get_document_service),
 ) -> DocumentListResponse:
-    documents = await document_service.list_documents(current_user)
+    documents = await document_service.list_documents(current_user, chat_id)
+    if documents is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chat not found")
     return DocumentListResponse(documents=[_to_response(doc) for doc in documents])
 
 
