@@ -299,13 +299,15 @@ export default function App() {
     return (
       <div className="shell">
         <header className="hero">
-          <p className="brand">Agentic RAG</p>
+          <div className="label-with-note">
+            <p className="brand">Agentic RAG</p>
+            <Explainer summary="About this demo">{INTRO}</Explainer>
+          </div>
           <h1>Ask your documents. Trace every answer.</h1>
           <p className="lede">
             Upload files, then let an agent choose retrieval, web search, or a direct answer —
             with citations you can verify.
           </p>
-          <Explainer>{INTRO}</Explainer>
         </header>
         <AuthForm busy={busy} error={error} onSubmit={handleAuth} />
       </div>
@@ -329,7 +331,12 @@ export default function App() {
       <div className="workspace-grid">
         <aside className="panel chats-panel">
           <div className="panel-head">
-            <h2>Chats</h2>
+            <div className="panel-title">
+              <h2>Chats</h2>
+              <Explainer summary="Why separate chats" tourAnchor>
+                {CHAT_SESSIONS}
+              </Explainer>
+            </div>
             <button
               type="button"
               className="ghost"
@@ -340,7 +347,6 @@ export default function App() {
               New
             </button>
           </div>
-          <Explainer summary="Why separate chats">{CHAT_SESSIONS}</Explainer>
           {chats.length === 0 ? (
             <p className="muted">Create a chat to upload documents and ask questions.</p>
           ) : (
@@ -385,23 +391,30 @@ export default function App() {
         </aside>
 
         <section className="panel ask-panel">
-          <h2>Ask</h2>
-          <Explainer>{COST_GUARDRAIL}</Explainer>
-          <Explainer>{CONVERSATION_MEMORY}</Explainer>
-          <form className="ask-form" onSubmit={handleAsk}>
-            <div className="ask-toolbar">
-              <button
-                type="button"
-                className="ghost"
-                data-tour="clear-memory"
-                disabled={busy || turns.length === 0 || !activeChatId}
-                onClick={handleClearMemory}
-              >
-                Clear chat memory
-              </button>
+          <div className="panel-head">
+            <div className="panel-title">
+              <h2>Ask</h2>
+              <Explainer
+                summary="How Ask works"
+                paragraphs={[COST_GUARDRAIL, CONVERSATION_MEMORY]}
+              />
             </div>
+            <button
+              type="button"
+              className="ghost"
+              data-tour="clear-memory"
+              disabled={busy || turns.length === 0 || !activeChatId}
+              onClick={handleClearMemory}
+            >
+              Clear chat memory
+            </button>
+          </div>
+          <form className="ask-form" onSubmit={handleAsk}>
             <label className="compact-label" data-tour="model-picker">
-              Model
+              <span className="label-with-note">
+                Model
+                <Explainer summary="Why the model picker matters">{MODEL_PICKER}</Explainer>
+              </span>
               <select
                 value={selectedModelId}
                 onChange={(event) => setSelectedModelId(event.target.value)}
@@ -414,7 +427,6 @@ export default function App() {
                 ))}
               </select>
             </label>
-            <Explainer summary="Why the model picker matters">{MODEL_PICKER}</Explainer>
             <textarea
               data-tour="question"
               value={question}
@@ -444,22 +456,24 @@ export default function App() {
                 return (
                   <article key={`${turn.question}-${index}`} className="turn">
                     <p className="question">{turn.question}</p>
-                    <div className="meta">
-                      <span className="badge">{turn.response.route}</span>
-                      <span className="badge">
-                        {turn.response.model_provider}: {turn.response.model_name}
-                      </span>
-                      {turn.response.tools_used.map((tool) => (
-                        <span key={tool} className="badge subtle">
-                          {tool}
+                    <div className="turn-meta-row">
+                      <div className="meta">
+                        <span className="badge">{turn.response.route}</span>
+                        <span className="badge">
+                          {turn.response.model_provider}: {turn.response.model_name}
                         </span>
-                      ))}
+                        {turn.response.tools_used.map((tool) => (
+                          <span key={tool} className="badge subtle">
+                            {tool}
+                          </span>
+                        ))}
+                      </div>
+                      <AnswerExplainerBlock
+                        title={walkthrough.title}
+                        paragraphs={walkthrough.paragraphs}
+                        align="end"
+                      />
                     </div>
-                    <AnswerExplainerBlock
-                      title={walkthrough.title}
-                      paragraphs={walkthrough.paragraphs}
-                      open={index === 0}
-                    />
                     <p className="answer">{turn.response.answer}</p>
                     <Citations citations={turn.response.citations} />
                   </article>
