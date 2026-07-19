@@ -1,11 +1,16 @@
 import type { CSSProperties } from "react";
 import { useEffect, useLayoutEffect, useMemo, useState } from "react";
-import { TOUR_STEPS, TourStep } from "../tour/tourSteps";
+import { TOUR_INVITE, TOUR_STEPS, TourStep } from "../tour/tourSteps";
+
+export type TourMode = "invite" | "guide";
 
 type Props = {
   active: boolean;
+  mode: TourMode;
   onClose: () => void;
   onComplete: () => void;
+  onAcceptInvite: () => void;
+  onDeclineInvite: () => void;
 };
 
 type Rect = {
@@ -18,20 +23,28 @@ type Rect = {
 const SPOTLIGHT_PAD = 10;
 const SPOTLIGHT_RADIUS = 14;
 
-export function ProductTour({ active, onClose, onComplete }: Props) {
+export function ProductTour({
+  active,
+  mode,
+  onClose,
+  onComplete,
+  onAcceptInvite,
+  onDeclineInvite,
+}: Props) {
   const [index, setIndex] = useState(0);
   const [targetRect, setTargetRect] = useState<Rect | null>(null);
   const step = TOUR_STEPS[index];
-  const isIntro = !step?.target;
+  const isInvite = mode === "invite";
+  const isCentered = isInvite || !step?.target;
 
   useEffect(() => {
-    if (active) {
+    if (active && mode === "guide") {
       setIndex(0);
     }
-  }, [active]);
+  }, [active, mode]);
 
   useLayoutEffect(() => {
-    if (!active || !step?.target) {
+    if (!active || isInvite || !step?.target) {
       setTargetRect(null);
       return;
     }
@@ -66,10 +79,10 @@ export function ProductTour({ active, onClose, onComplete }: Props) {
       window.removeEventListener("scroll", measure, true);
       currentTarget?.classList.remove("tour-target-active");
     };
-  }, [active, step]);
+  }, [active, isInvite, step]);
 
   const cardStyle = useMemo(() => {
-    if (!targetRect || isIntro) {
+    if (!targetRect || isCentered) {
       return undefined;
     }
 
@@ -96,21 +109,45 @@ export function ProductTour({ active, onClose, onComplete }: Props) {
       top: Math.max(16, top),
       width: cardWidth,
     };
-  }, [isIntro, targetRect]);
+  }, [isCentered, targetRect]);
 
   const scrimStyle = useMemo(() => {
-    if (!targetRect || isIntro) {
+    if (!targetRect || isCentered) {
       return undefined;
     }
     return { clipPath: holeClipPath(targetRect, SPOTLIGHT_PAD) };
-  }, [isIntro, targetRect]);
+  }, [isCentered, targetRect]);
 
-  if (!active || !step) {
+  if (!active) {
     return null;
   }
 
-  function closeTour() {
-    onClose();
+  if (isInvite) {
+    return (
+      <div className="tour-layer" role="dialog" aria-modal="true" aria-label="Project guide invite">
+        <div className="tour-scrim" />
+        <section className="tour-card tour-card-intro">
+          <button type="button" className="tour-close" aria-label="Close" onClick={onDeclineInvite}>
+            ×
+          </button>
+          <span className="tour-kicker">First visit</span>
+          <h2>{TOUR_INVITE.title}</h2>
+          <p>{TOUR_INVITE.body}</p>
+          <div className="tour-actions">
+            <button type="button" className="ghost" onClick={onDeclineInvite}>
+              {TOUR_INVITE.declineLabel}
+            </button>
+            <button type="button" onClick={onAcceptInvite}>
+              {TOUR_INVITE.acceptLabel}
+            </button>
+          </div>
+        </section>
+      </div>
+    );
+  }
+
+  if (!step) {
+    return null;
   }
 
   function nextStep() {
@@ -128,14 +165,14 @@ export function ProductTour({ active, onClose, onComplete }: Props) {
   return (
     <div className="tour-layer" role="dialog" aria-modal="true" aria-label="Product tour">
       <div className="tour-scrim" style={scrimStyle} />
-      {targetRect && !isIntro ? <Spotlight rect={targetRect} /> : null}
+      {targetRect && !isCentered ? <Spotlight rect={targetRect} /> : null}
       <TourCard
         step={step}
         index={index}
         total={TOUR_STEPS.length}
-        isIntro={isIntro}
+        isCentered={isCentered}
         style={cardStyle}
-        onClose={closeTour}
+        onClose={onClose}
         onNext={nextStep}
         onPrevious={previousStep}
       />
@@ -187,7 +224,7 @@ type CardProps = {
   step: TourStep;
   index: number;
   total: number;
-  isIntro: boolean;
+  isCentered: boolean;
   style?: CSSProperties;
   onClose: () => void;
   onNext: () => void;
@@ -198,20 +235,22 @@ function TourCard({
   step,
   index,
   total,
-  isIntro,
+  isCentered,
   style,
   onClose,
   onNext,
   onPrevious,
 }: CardProps) {
-  const className = isIntro || !style ? "tour-card tour-card-intro" : "tour-card";
+  const className = isCentered || !style ? "tour-card tour-card-intro" : "tour-card";
 
   return (
     <section className={className} style={style}>
       <button type="button" className="tour-close" aria-label="Close tour" onClick={onClose}>
         ×
       </button>
-      <span className="tour-kicker">{isIntro ? "Start here" : `Step ${index + 1} of ${total}`}</span>
+      <span className="tour-kicker">
+        {isCentered ? "Guide" : `Step ${index + 1} of ${total}`}
+      </span>
       <h2>{step.title}</h2>
       <p>{step.body}</p>
       <div className="tour-actions">
