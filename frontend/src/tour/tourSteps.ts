@@ -5,101 +5,50 @@ export type TourStep = {
   target?: string;
 };
 
+export const TOUR_INVITE = {
+  title: "Want a quick walkthrough?",
+  body:
+    "This project is an agentic RAG demo: each chat owns its documents, and an agent decides when to retrieve from your files, search the web, or answer directly. " +
+    "I can show you the flow in about a minute — useful if you want the product story and a bit of the architecture.",
+  acceptLabel: "Take the guide",
+  declineLabel: "Skip for now",
+};
+
+/** Condensed guide after the user accepts the invite. Keep it short. */
 export const TOUR_STEPS: TourStep[] = [
   {
-    id: "intro",
-    title: "Welcome to Agentic RAG",
+    id: "chats",
+    title: "Chats are workspaces",
     body:
-      "This app lets you create separate chats, upload documents into each one, and ask an agent that can retrieve, search the web, or answer directly. Dashed info icons explain the technical pieces as you explore.",
-  },
-  {
-    id: "tour-launcher",
-    title: "Replay the tour",
-    body: "Use this corner control to replay the guide or simulate a first visit for demos.",
-    target: '[data-tour="tour-launcher"]',
-  },
-  {
-    id: "sign-out",
-    title: "Session control",
-    body: "Sign out clears the browser session token. Your chats and documents stay on the server.",
-    target: '[data-tour="sign-out"]',
-  },
-  {
-    id: "new-chat",
-    title: "New chat",
-    body:
-      "A chat is an isolated workspace. Documents and message history in one chat do not leak into another.",
+      "Create a chat per topic. Documents and message history stay scoped to that chat, so retrieval never mixes contexts.",
     target: '[data-tour="new-chat"]',
   },
   {
-    id: "chat-select",
-    title: "Switch context",
-    body: "Selecting a chat loads only that chat's documents and saved messages.",
-    target: '[data-tour="chat-select"]',
-  },
-  {
-    id: "delete-chat",
-    title: "Delete chat",
-    body: "Deleting a chat removes that chat, its persisted messages, and its uploaded documents.",
-    target: '[data-tour="delete-chat"]',
-  },
-  {
-    id: "tech-icons",
-    title: "Technical notes",
+    id: "documents",
+    title: "Upload & index",
     body:
-      "Dashed info icons open short technical notes about what the app is doing under the hood.",
-    target: '[data-tour="tech-note"]',
-  },
-  {
-    id: "upload",
-    title: "Upload documents",
-    body:
-      "Uploads are extracted, chunked, embedded, and stored in pgvector so retrieval can search semantic passages.",
+      "Files are extracted, chunked, embedded, and stored in Postgres with pgvector. Later questions search those vectors — not the whole file again.",
     target: '[data-tour="upload-doc"]',
   },
   {
-    id: "preview",
-    title: "Preview files",
-    body: "Preview streams the original uploaded file back inline so you can verify the source.",
-    target: '[data-tour="preview-doc"]',
-  },
-  {
-    id: "remove-doc",
-    title: "Remove files",
-    body: "Remove deletes this document and its indexed chunks from the active chat.",
-    target: '[data-tour="remove-doc"]',
-  },
-  {
-    id: "clear-memory",
-    title: "Clear chat memory",
-    body: "This clears persisted messages for the active chat without deleting uploaded documents.",
-    target: '[data-tour="clear-memory"]',
-  },
-  {
-    id: "model-picker",
-    title: "Model picker",
-    body:
-      "Auto inspects the question before the agent call. You can also lock a provider and model manually.",
-    target: '[data-tour="model-picker"]',
-  },
-  {
-    id: "question",
-    title: "Question box",
-    body: "The public demo caps question length to control token usage and keep API spend predictable.",
-    target: '[data-tour="question"]',
-  },
-  {
     id: "ask",
-    title: "Ask button",
+    title: "Ask the agent",
     body:
-      "The agent decides which tool to call, gathers context, then writes a grounded final answer.",
+      "The agent picks a tool path: retrieve_documents, web_search, or answer_directly. Auto can also choose a model before that loop runs.",
     target: '[data-tour="ask-button"]',
   },
   {
-    id: "turns",
-    title: "Answers and citations",
+    id: "tech-notes",
+    title: "Dashed info icons",
     body:
-      "Answers show the route, model, tools used, and citations so you can audit what happened.",
+      "Tap a dashed i next to a section title for a short technical note — chats, uploads, models, memory, citations, and more. They stay tucked away until you want the detail.",
+    target: '[data-tour="tech-note"]',
+  },
+  {
+    id: "answers",
+    title: "Traceable answers",
+    body:
+      "Each reply shows route, model, and citations so you can verify what the agent used.",
     target: '[data-tour="turns"]',
   },
 ];

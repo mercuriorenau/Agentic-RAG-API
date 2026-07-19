@@ -26,7 +26,7 @@ import { AuthForm } from "./components/AuthForm";
 import { Citations } from "./components/Citations";
 import { DocumentPanel } from "./components/DocumentPanel";
 import { AnswerExplainerBlock, Explainer } from "./components/Explainer";
-import { ProductTour } from "./components/ProductTour";
+import { ProductTour, TourMode } from "./components/ProductTour";
 import { TourLauncher } from "./components/TourLauncher";
 import {
   CHAT_SESSIONS,
@@ -65,7 +65,7 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [userKey, setUserKey] = useState(getUserKey());
-  const [tourActive, setTourActive] = useState(false);
+  const [tourMode, setTourMode] = useState<TourMode | null>(null);
 
   async function refreshChats(preferredId?: string | null) {
     const items = await listChats();
@@ -111,7 +111,7 @@ export default function App() {
     if (!authed || !userKey || hasCompletedTour(userKey)) {
       return;
     }
-    setTourActive(true);
+    setTourMode("invite");
   }, [authed, userKey]);
 
   useEffect(() => {
@@ -144,7 +144,7 @@ export default function App() {
     clearToken();
     setAuthed(false);
     setUserKey(null);
-    setTourActive(false);
+    setTourMode(null);
     setChats([]);
     setActiveChatId(null);
     setDocuments([]);
@@ -269,21 +269,30 @@ export default function App() {
 
   function handleTourClose() {
     markTourComplete(userKey);
-    setTourActive(false);
+    setTourMode(null);
   }
 
   function handleTourComplete() {
     markTourComplete(userKey);
-    setTourActive(false);
+    setTourMode(null);
+  }
+
+  function handleAcceptInvite() {
+    setTourMode("guide");
+  }
+
+  function handleDeclineInvite() {
+    markTourComplete(userKey);
+    setTourMode(null);
   }
 
   function handleStartTour() {
-    setTourActive(true);
+    setTourMode("guide");
   }
 
   function handleSimulateFirstVisit() {
     clearTourComplete(userKey);
-    setTourActive(true);
+    setTourMode("invite");
   }
 
   if (!authed) {
@@ -465,9 +474,12 @@ export default function App() {
         onSimulateFirstVisit={handleSimulateFirstVisit}
       />
       <ProductTour
-        active={tourActive}
+        active={tourMode !== null}
+        mode={tourMode || "invite"}
         onClose={handleTourClose}
         onComplete={handleTourComplete}
+        onAcceptInvite={handleAcceptInvite}
+        onDeclineInvite={handleDeclineInvite}
       />
     </div>
   );
