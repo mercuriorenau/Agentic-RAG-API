@@ -13,8 +13,10 @@ export function Citations({ citations }: Props) {
 
   return (
     <div className="citations">
-      <h3>Citations</h3>
-      <Explainer>{CITATIONS}</Explainer>
+      <div className="citations-head">
+        <h3>Citations</h3>
+        <Explainer summary="What citations are">{CITATIONS}</Explainer>
+      </div>
       <ul>
         {citations.map((citation, index) => (
           <li key={`${citation.chunk_id || citation.url || citation.excerpt}-${index}`}>

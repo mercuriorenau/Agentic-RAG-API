@@ -103,7 +103,10 @@ export function DocumentPanel({ documents, busy, onUpload, onDelete }: Props) {
   return (
     <div className="chat-docs">
       <div className="chat-docs-head">
-        <span className="chat-docs-label">Documents</span>
+        <span className="label-with-note">
+          <span className="chat-docs-label">Documents</span>
+          <Explainer summary="What happens on upload">{DOC_UPLOAD}</Explainer>
+        </span>
         <button
           type="button"
           className="linkish"
@@ -121,7 +124,6 @@ export function DocumentPanel({ documents, busy, onUpload, onDelete }: Props) {
           onChange={handleChange}
         />
       </div>
-      <Explainer summary="What happens on upload">{DOC_UPLOAD}</Explainer>
       {previewError ? <p className="form-error">{previewError}</p> : null}
       {documents.length === 0 ? (
         <p className="muted compact-muted">No files in this chat yet.</p>

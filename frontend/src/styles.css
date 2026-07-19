@@ -305,10 +305,24 @@ button.linkish.danger:hover:not(:disabled) {
   margin-bottom: 1rem;
 }
 
+.panel-title {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
 .panel h2 {
   margin: 0;
   font-family: var(--font-serif);
   font-size: 1.4rem;
+}
+
+.label-with-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
 }
 
 .doc-list {
@@ -368,11 +382,6 @@ button.linkish.danger:hover:not(:disabled) {
   display: grid;
   gap: 0.75rem;
   margin-bottom: 1.25rem;
-}
-
-.ask-toolbar {
-  display: flex;
-  justify-content: flex-end;
 }
 
 .preview-overlay {
@@ -504,6 +513,14 @@ button.linkish.danger:hover:not(:disabled) {
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
+  min-width: 0;
+}
+
+.turn-meta-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
   margin-bottom: 0.75rem;
 }
 
@@ -553,34 +570,205 @@ button.linkish.danger:hover:not(:disabled) {
   line-height: 1.45;
 }
 
+/* Resting mark is 75% of the prior 1.35rem control. */
 .tech-note {
   position: relative;
   display: inline-flex;
+  flex-shrink: 0;
   width: fit-content;
   vertical-align: middle;
 }
 
 .tech-note-trigger {
-  width: 1.65rem;
-  height: 1.65rem;
-  display: inline-grid;
-  place-items: center;
+  --tech-note-size: 1.0125rem;
+  --tech-note-expanded: 5.85rem;
+  position: relative;
+  width: var(--tech-note-size);
+  height: var(--tech-note-size);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 0;
-  border: 1px dashed rgba(15, 107, 92, 0.34);
+  overflow: hidden;
+  border: 0;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.28);
   color: var(--accent);
-  font-family: var(--font-serif);
-  font-size: 0.92rem;
-  font-style: italic;
-  line-height: 1;
   box-shadow: var(--shadow-soft);
+  transform-origin: center;
+  animation: tech-note-pulse 2.8s ease-in-out infinite;
+  will-change: transform, width;
+  transition:
+    width 0.55s cubic-bezier(0.22, 1, 0.36, 1),
+    height 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+    padding 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+    background 0.25s ease,
+    box-shadow 0.25s ease,
+    margin 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Circle-only dashed ring — hidden when expanded so rotation never cuts the label. */
+.tech-note-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: var(--tech-note-size);
+  height: var(--tech-note-size);
+  margin: calc(var(--tech-note-size) / -2) 0 0 calc(var(--tech-note-size) / -2);
+  border-radius: 999px;
+  border: 1px dashed rgba(15, 107, 92, 0.36);
+  pointer-events: none;
+  animation: tech-note-spin 18s linear infinite;
+  transition: opacity 0.2s ease;
+}
+
+.tech-note-copy {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: center;
+  max-width: 100%;
+  white-space: nowrap;
+  line-height: 1;
+  font-size: 0.68rem;
+  letter-spacing: 0.01em;
+}
+
+.tech-note-more,
+.tech-note-nfo {
+  display: inline-block;
+  max-width: 0;
+  opacity: 0;
+  overflow: hidden;
+  vertical-align: baseline;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 500;
+  transition:
+    max-width 0.42s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.28s ease,
+    transform 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.tech-note-more {
+  transform: translateX(0.45em);
+}
+
+.tech-note-nfo {
+  transform: translateX(-0.35em);
+}
+
+.tech-note-i-slot {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 0.42em;
+  min-height: 1em;
+}
+
+.tech-note-glyph {
+  display: inline-block;
+  font-family: var(--font-serif);
+  font-size: 0.72rem;
+  font-style: italic;
+  font-weight: 500;
+  line-height: 1;
+  /* Italic serif “i” reads heavy on the right; nudge optical center. */
+  transform: translate(-0.07em, 0.01em);
 }
 
 .tech-note-trigger:hover:not(:disabled),
 .tech-note-trigger[aria-expanded="true"] {
-  background: rgba(255, 255, 255, 0.55);
-  border-color: rgba(15, 107, 92, 0.5);
+  width: var(--tech-note-expanded);
+  height: 1.28rem;
+  padding: 0 0.55rem;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow:
+    0 0 0 1px rgba(15, 107, 92, 0.18),
+    var(--shadow-soft);
+  animation: none;
+  transform: none;
+}
+
+.tech-note.align-end .tech-note-trigger:hover:not(:disabled),
+.tech-note.align-end .tech-note-trigger[aria-expanded="true"] {
+  margin-left: calc(var(--tech-note-size) - var(--tech-note-expanded));
+}
+
+.tech-note-trigger:hover:not(:disabled) .tech-note-ring,
+.tech-note-trigger[aria-expanded="true"] .tech-note-ring {
+  opacity: 0;
+  animation: none;
+}
+
+.tech-note-trigger:hover:not(:disabled) .tech-note-more,
+.tech-note-trigger[aria-expanded="true"] .tech-note-more,
+.tech-note-trigger:hover:not(:disabled) .tech-note-nfo,
+.tech-note-trigger[aria-expanded="true"] .tech-note-nfo {
+  max-width: 3.5em;
+  opacity: 1;
+  transform: translateX(0);
+  /* Land after the “i” hop peaks so it feels like the letter jumps into “info”. */
+  transition-delay: 0.16s;
+}
+
+.tech-note-trigger:hover:not(:disabled) .tech-note-glyph,
+.tech-note-trigger[aria-expanded="true"] .tech-note-glyph {
+  font-size: 0.68rem;
+  animation: tech-note-i-jump 0.58s cubic-bezier(0.34, 1.45, 0.64, 1) both;
+}
+
+@keyframes tech-note-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.16);
+  }
+}
+
+@keyframes tech-note-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Hop from the lone mark into the “i” of “info”. */
+@keyframes tech-note-i-jump {
+  0% {
+    transform: translate(-0.07em, 0.01em) scale(1);
+  }
+  38% {
+    transform: translate(0.12em, -0.48em) scale(1.28);
+  }
+  72% {
+    transform: translate(0.02em, 0.06em) scale(0.96);
+  }
+  100% {
+    transform: translate(0, 0.01em) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tech-note-trigger,
+  .tech-note-ring,
+  .tech-note-more,
+  .tech-note-nfo,
+  .tech-note-glyph {
+    animation: none !important;
+    transition: none;
+  }
+
+  .tech-note-trigger:hover:not(:disabled) .tech-note-more,
+  .tech-note-trigger[aria-expanded="true"] .tech-note-more,
+  .tech-note-trigger:hover:not(:disabled) .tech-note-nfo,
+  .tech-note-trigger[aria-expanded="true"] .tech-note-nfo {
+    transition-delay: 0s;
+  }
 }
 
 .tech-note-popover {
@@ -600,13 +788,25 @@ button.linkish.danger:hover:not(:disabled) {
   box-shadow: 0 16px 40px rgba(26, 36, 33, 0.14);
 }
 
+.tech-note-popover.align-end {
+  left: auto;
+  right: 0;
+}
+
 .tech-note-popover strong {
   color: var(--ink);
   font-size: 0.92rem;
 }
 
-.citations h3 {
-  margin: 0 0 0.5rem;
+.citations-head {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
+}
+
+.citations-head h3 {
+  margin: 0;
   font-size: 0.95rem;
 }
 
