@@ -48,6 +48,7 @@ async def test_retrieve_fuses_dense_and_lexical() -> None:
         top_k=5,
         candidate_multiplier=4,
         retrieval_min_score=0.2,
+        rerank_enabled=False,
     )
     service = RAGService(db, settings=settings)
     service.embedding_service = AsyncMock()
@@ -71,6 +72,7 @@ async def test_retrieve_filters_below_min_score() -> None:
         top_k=5,
         candidate_multiplier=4,
         retrieval_min_score=0.5,
+        rerank_enabled=False,
     )
     service = RAGService(db, settings=settings)
     service.embedding_service = AsyncMock()
@@ -85,13 +87,62 @@ async def test_retrieve_empty() -> None:
     db = AsyncMock()
     empty = MagicMock(all=MagicMock(return_value=[]))
     db.execute = AsyncMock(side_effect=[empty, empty])
-    settings = MagicMock(top_k=5, candidate_multiplier=4, retrieval_min_score=0.25)
+    settings = MagicMock(top_k=5, candidate_multiplier=4, retrieval_min_score=0.25, rerank_enabled=False)
     service = RAGService(db, settings=settings)
     service.embedding_service = AsyncMock()
     service.embedding_service.embed_query.return_value = [1.0] * 1536
     assert await service.retrieve(MagicMock(), "hello") == []
 
 
-def test_retrieved_chunk_dataclass() -> None:
-    item = RetrievedChunk(chunk=MagicMock(), document=MagicMock(), score=0.9)
-    assert item.score == 0.9
+@pytest.mark.asyncio
+async def test_retrieve_uses_reranker_order() -> None:
+    db = AsyncMock()
+    chunk_a = MagicMock(id=uuid4(), chunk_index=0, content="alpha")
+    chunk_b = MagicMock(id=uuid4(), chunk_index=1, content="beta")
+    document = MagicMock(id=uuid4(), filename="doc.txt")
+    dense_result = MagicMock(
+        all=MagicMock(return_value=[(chunk_a, document, 0.1), (chunk_b, document, 0.2)])
+    )
+    lexical_result = MagicMock(all=MagicMock(return_value=[]))
+    db.execute = AsyncMock(side_effect=[dense_result, lexical_result])
+
+    settings = MagicMock(
+        top_k=2,
+        candidate_multiplier=4,
+        retrieval_min_score=0.2,
+        rerank_enabled=True,
+    )
+    reranker = AsyncMock()
+    reranker.rank_indices.return_value = [1, 0]
+    service = RAGService(db, settings=settings, reranker=reranker)
+    service.embedding_service = AsyncMock()
+    service.embedding_service.embed_query.return_value = [1.0] * 1536
+
+    retrieved = await service.retrieve(MagicMock(), "beta first")
+    assert [item.chunk.id for item in retrieved] == [chunk_b.id, chunk_a.id]
+
+
+@pytest.mark.asyncio
+async def test_retrieve_fail_open_when_rerank_returns_none() -> None:
+    db = AsyncMock()
+    chunk = MagicMock(id=uuid4(), chunk_index=0, content="keep me")
+    document = MagicMock(id=uuid4(), filename="doc.txt")
+    dense_result = MagicMock(all=MagicMock(return_value=[(chunk, document, 0.1)]))
+    lexical_result = MagicMock(all=MagicMock(return_value=[]))
+    db.execute = AsyncMock(side_effect=[dense_result, lexical_result])
+
+    settings = MagicMock(
+        top_k=5,
+        candidate_multiplier=4,
+        retrieval_min_score=0.2,
+        rerank_enabled=True,
+    )
+    reranker = AsyncMock()
+    reranker.rank_indices.return_value = None
+    service = RAGService(db, settings=settings, reranker=reranker)
+    service.embedding_service = AsyncMock()
+    service.embedding_service.embed_query.return_value = [1.0] * 1536
+
+    retrieved = await service.retrieve(MagicMock(), "keep")
+    assert len(retrieved) == 1
+    assert retrieved[0].chunk.id == chunk.id
