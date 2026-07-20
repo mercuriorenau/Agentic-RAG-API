@@ -58,7 +58,7 @@ async def test_agent_uses_retrieve_tool() -> None:
     document.id = "d1"
     document.filename = "policy.txt"
     retrieved = MagicMock(chunk=chunk, document=document, score=0.91)
-    rag.retrieve.return_value = [retrieved]
+    rag.retrieve.return_value = MagicMock(chunks=[retrieved], trace=MagicMock(to_dicts=lambda: []))
 
     settings = Settings(openai_api_key="openai", agent_max_tool_rounds=3)
 
