@@ -8,7 +8,11 @@ from app.core.config import Settings, get_settings
 from app.core.logging import get_logger
 from app.models import Chat, Chunk, Document, User
 from app.services.embedding_service import EmbeddingService
-from app.utils.extractors import UnsupportedFileTypeError, chunk_text, extract_text
+from app.utils.extractors import (
+    UnsupportedFileTypeError,
+    chunk_pages,
+    extract_pages,
+)
 
 logger = get_logger(__name__)
 
@@ -91,19 +95,21 @@ class DocumentService:
         await self.db.flush()
 
         try:
-            text = extract_text(file_path, content_type)
-            chunks = chunk_text(text, self.settings.chunk_size, self.settings.chunk_overlap)
+            pages = extract_pages(file_path, content_type)
+            chunks = chunk_pages(pages, self.settings.chunk_size, self.settings.chunk_overlap)
             if not chunks:
                 raise ValueError("Document contains no text after extraction")
 
-            embeddings = await self.embedding_service.embed_texts(chunks)
-            for index, (content, embedding) in enumerate(zip(chunks, embeddings, strict=True)):
+            contents = [chunk.content for chunk in chunks]
+            embeddings = await self.embedding_service.embed_texts(contents)
+            for index, (chunk, embedding) in enumerate(zip(chunks, embeddings, strict=True)):
                 self.db.add(
                     Chunk(
                         id=uuid.uuid4(),
                         document_id=document.id,
                         chunk_index=index,
-                        content=content,
+                        page_number=chunk.page_number,
+                        content=chunk.content,
                         embedding=embedding,
                     )
                 )

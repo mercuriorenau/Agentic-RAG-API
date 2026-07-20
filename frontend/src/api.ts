@@ -3,6 +3,7 @@ export type Citation = {
   document_id?: string | null;
   document_name?: string | null;
   chunk_id?: string | null;
+  page_number?: number | null;
   excerpt: string;
   score?: number | null;
   url?: string | null;
