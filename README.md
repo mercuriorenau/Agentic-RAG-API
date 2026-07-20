@@ -32,13 +32,15 @@ flowchart TB
   Web --> Tavily
 ```
 
-**Ingestion:** upload → extract text (PDF/TXT/MD) → fixed-size overlapping chunks → embed (`text-embedding-3-small`) → store in PostgreSQL with pgvector.
+**Ingestion:** upload → extract text page-aware (PDF/TXT/MD) → paragraph-first overlapping chunks → embed (`text-embedding-3-small`) → store in PostgreSQL with pgvector.
 
-**Chunking:** `CHUNK_SIZE=800` characters with `CHUNK_OVERLAP=100`. Overlapping windows keep boundary context across chunks and keep embedding batch sizes predictable.
+**Chunking:** paragraph-aware splits driven by `CHUNK_SIZE` / `CHUNK_OVERLAP` (defaults `800` / `100`). PDF chunks keep `page_number` for citations. Re-upload existing documents after changing chunking so they pick up the new strategy.
+
+**Retrieval:** hybrid dense (pgvector) + Postgres full-text search, fused with Reciprocal Rank Fusion (RRF), filtered by `RETRIEVAL_MIN_SCORE`, then optionally reranked with a small LLM (`RERANK_MODEL`, default `gpt-4o-mini`).
 
 **Model selection:** each query can request `auto`, `openai`, or `anthropic`. Auto mode inspects the question before the agent call, chooses a configured provider/model, and returns an explanation of the decision.
 
-**Query:** the selected LLM calls tools as needed (`retrieve_documents`, `web_search`, `answer_directly`), then produces a final answer with citations and a `route` field (`retrieve` | `web` | `direct` | `mixed`).
+**Query:** the selected LLM calls tools as needed (`retrieve_documents`, `web_search`, `answer_directly`), then produces a final answer with citations and a `route` field (`retrieve` | `web` | `direct` | `mixed`). Empty retrieve results return no document citations; the agent is instructed not to invent document content.
 
 **UI walkthrough:** the web app shows short explainers next to upload, model choice, answers, and citations so you can see chunking, retrieval, tool routing, and grounding while you use the demo.
 
@@ -156,13 +158,30 @@ Vite proxies `/api` to `http://localhost:8000`.
 
 ## Evals
 
-Offline heuristic evals live in `evals/`:
+Heuristic evals live in `evals/`:
 
-- `cases.json` — questions with expected routes and sample answers
+- `cases.json` — questions, expected routes, keywords, and fixture names
+- `fixtures/` — sample documents seeded for live runs
 - `scorers.py` — retrieval relevance and answer groundedness
-- `python -m evals.run_evals` — prints pass/fail per case
+- `python -m evals.run_evals` — offline, CI-safe (uses canned samples)
+- `python -m evals.run_evals --live` — seeds fixtures into Postgres, runs real retrieve (+ agent when keys allow)
+
+Live mode needs `DATABASE_URL`, `OPENAI_API_KEY` (embeddings), and a running Postgres with pgvector.
 
 Pytest covers the scorers under `tests/evals/`.
+
+## RAG quality knobs
+
+| Variable | Role | Default |
+|----------|------|---------|
+| `CHUNK_SIZE` / `CHUNK_OVERLAP` | Paragraph-aware chunk windows | `800` / `100` |
+| `TOP_K` | Final passages passed to the agent | `5` |
+| `CANDIDATE_MULTIPLIER` | Dense/FTS pool size = `TOP_K * multiplier` | `4` |
+| `RETRIEVAL_MIN_SCORE` | Drop weak matches (cosine or mapped FTS) | `0.25` |
+| `RERANK_ENABLED` | LLM listwise rerank after fusion | `true` |
+| `RERANK_MODEL` | Model used for reranking | `gpt-4o-mini` |
+
+After changing chunking settings, **re-upload documents** so chunks and embeddings regenerate. Older uploads keep their previous chunk boundaries.
 
 ## Environment variables
 
@@ -179,7 +198,11 @@ Pytest covers the scorers under `tests/evals/`.
 | `ANTHROPIC_CHAT_MODEL` | Anthropic chat model | `claude-sonnet-4-20250514` |
 | `CHUNK_SIZE` | Characters per chunk | `800` |
 | `CHUNK_OVERLAP` | Chunk overlap | `100` |
-| `TOP_K` | Chunks retrieved per query | `5` |
+| `TOP_K` | Final chunks passed to the agent | `5` |
+| `CANDIDATE_MULTIPLIER` | Hybrid candidate pool multiplier | `4` |
+| `RETRIEVAL_MIN_SCORE` | Minimum retrieve score (0-1) | `0.25` |
+| `RERANK_ENABLED` | Enable LLM rerank after hybrid fusion | `true` |
+| `RERANK_MODEL` | Rerank chat model | `gpt-4o-mini` |
 | `AGENT_MAX_TOOL_ROUNDS` | Max tool-calling rounds | `3` |
 | `MAX_QUERY_LENGTH` | Max question length in characters | `600` |
 | `UPLOAD_DIR` | File storage path | `./uploads` |
