@@ -36,11 +36,11 @@ flowchart TB
 
 **Chunking:** paragraph-aware splits driven by `CHUNK_SIZE` / `CHUNK_OVERLAP` (defaults `800` / `100`). PDF chunks keep `page_number` for citations. Re-upload existing documents after changing chunking so they pick up the new strategy.
 
-**Retrieval:** hybrid dense (pgvector) + Postgres full-text search, fused with Reciprocal Rank Fusion (RRF), filtered by `RETRIEVAL_MIN_SCORE`, then optionally reranked with a small LLM (`RERANK_MODEL`, default `gpt-4o-mini`).
+**Retrieval:** hybrid dense (pgvector) + Postgres full-text search, fused with Reciprocal Rank Fusion (RRF), filtered by `RETRIEVAL_MIN_SCORE`, then optionally reranked with a small LLM (`RERANK_MODEL`, default `gpt-4o-mini`). When Self-RAG is enabled, the system grades evidence quality and may rewrite the query and retry retrieve (up to `SELF_RAG_MAX_RETRIES`).
 
 **Model selection:** each query can request `auto`, `openai`, or `anthropic`. Auto mode inspects the question before the agent call, chooses a configured provider/model, and returns an explanation of the decision.
 
-**Query:** the selected LLM calls tools as needed (`retrieve_documents`, `web_search`, `answer_directly`), then produces a final answer with citations and a `route` field (`retrieve` | `web` | `direct` | `mixed`). Empty retrieve results return no document citations; the agent is instructed not to invent document content.
+**Query:** the selected LLM calls tools as needed (`retrieve_documents`, `web_search`, `answer_directly`), then produces a final answer with citations, optional `retrieval_trace` (Self-RAG attempts), and a `route` field (`retrieve` | `web` | `direct` | `mixed`). Empty retrieve results return no document citations; the agent is instructed not to invent document content.
 
 **UI walkthrough:** the web app shows short explainers next to upload, model choice, answers, and citations so you can see chunking, retrieval, tool routing, and grounding while you use the demo.
 
@@ -72,7 +72,7 @@ Deploy your own instance to Railway (see below) or run locally with Docker Compo
 
 Interactive docs: `http://localhost:8000/docs`
 
-Query response includes `answer`, `citations`, `tools_used`, `route`, `model_provider`, `model_name`, and `model_selection_explanation`.
+Query response includes `answer`, `citations`, `tools_used`, `route`, `model_provider`, `model_name`, `model_selection_explanation`, and optional `retrieval_trace`.
 
 Each chat owns its own documents and message history. Retrieval only searches documents attached to the `chat_id` on the query. `POST /api/v1/queries` also accepts optional `history` (prior question/answer turns); if omitted, the server loads recent turns from that chat.
 
@@ -163,10 +163,12 @@ Heuristic evals live in `evals/`:
 - `cases.json` — questions, expected routes, keywords, and fixture names
 - `fixtures/` — sample documents seeded for live runs
 - `scorers.py` — retrieval relevance and answer groundedness
+- `judges.py` — optional LLM-as-judge faithfulness / answer relevance
 - `python -m evals.run_evals` — offline, CI-safe (uses canned samples)
 - `python -m evals.run_evals --live` — seeds fixtures into Postgres, runs real retrieve (+ agent when keys allow)
+- `python -m evals.run_evals --live --judge` — live path plus LLM judge scores (extra API cost)
 
-Live mode needs `DATABASE_URL`, `OPENAI_API_KEY` (embeddings), and a running Postgres with pgvector.
+Live mode needs `DATABASE_URL`, `OPENAI_API_KEY` (embeddings), and a running Postgres with pgvector. `--judge` also needs `OPENAI_API_KEY`.
 
 Pytest covers the scorers under `tests/evals/`.
 
@@ -179,7 +181,11 @@ Pytest covers the scorers under `tests/evals/`.
 | `CANDIDATE_MULTIPLIER` | Dense/FTS pool size = `TOP_K * multiplier` | `4` |
 | `RETRIEVAL_MIN_SCORE` | Drop weak matches (cosine or mapped FTS) | `0.25` |
 | `RERANK_ENABLED` | LLM listwise rerank after fusion | `true` |
-| `RERANK_MODEL` | Model used for reranking | `gpt-4o-mini` |
+| `RERANK_MODEL` | Model used for rerank / Self-RAG / judge | `gpt-4o-mini` |
+| `SELF_RAG_ENABLED` | Grade evidence and rewrite/retry weak retrieves | `true` |
+| `SELF_RAG_MAX_RETRIES` | Extra retrieve attempts after the first | `2` |
+
+Self-RAG and rerank add small-model calls per retrieve, so latency and cost rise slightly when enabled.
 
 After changing chunking settings, **re-upload documents** so chunks and embeddings regenerate. Older uploads keep their previous chunk boundaries.
 
@@ -202,7 +208,9 @@ After changing chunking settings, **re-upload documents** so chunks and embeddin
 | `CANDIDATE_MULTIPLIER` | Hybrid candidate pool multiplier | `4` |
 | `RETRIEVAL_MIN_SCORE` | Minimum retrieve score (0-1) | `0.25` |
 | `RERANK_ENABLED` | Enable LLM rerank after hybrid fusion | `true` |
-| `RERANK_MODEL` | Rerank chat model | `gpt-4o-mini` |
+| `RERANK_MODEL` | Rerank / Self-RAG / judge chat model | `gpt-4o-mini` |
+| `SELF_RAG_ENABLED` | Enable Self-RAG grade/rewrite/retry | `true` |
+| `SELF_RAG_MAX_RETRIES` | Extra Self-RAG retrieve attempts | `2` |
 | `AGENT_MAX_TOOL_ROUNDS` | Max tool-calling rounds | `3` |
 | `MAX_QUERY_LENGTH` | Max question length in characters | `600` |
 | `UPLOAD_DIR` | File storage path | `./uploads` |
