@@ -60,14 +60,35 @@ async def ask_question(
         messages = await chat_service.list_messages(current_user, chat_id)
         history = _history_from_messages(messages or [])
 
-    response = await agent_service.answer_question(
-        current_user,
-        body.question,
-        chat_id=chat_id,
-        model_mode=body.model_mode,
-        model_name=body.model_name,
-        history=history,
-    )
+    try:
+        response = await agent_service.answer_question(
+            current_user,
+            body.question,
+            chat_id=chat_id,
+            model_mode=body.model_mode,
+            model_name=body.model_name,
+            history=history,
+        )
+    except Exception as exc:
+        # Surface provider model/auth failures clearly instead of a generic 500.
+        name = type(exc).__name__
+        message = str(exc)
+        if "NotFoundError" in name or "model:" in message.lower() or "not_found_error" in message:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=(
+                    "The selected LLM model was rejected by the provider. "
+                    "Try OpenAI from the model dropdown, or set ANTHROPIC_CHAT_MODEL "
+                    "to a current Claude ID (for example claude-sonnet-4-5)."
+                ),
+            ) from exc
+        if "AuthenticationError" in name or "Unauthorized" in message:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="LLM provider authentication failed. Check your API keys.",
+            ) from exc
+        raise
+
     await chat_service.append_turn(current_user, chat_id, body.question, response)
     return response
 
