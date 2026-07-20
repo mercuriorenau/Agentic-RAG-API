@@ -7,9 +7,10 @@ export const INTRO =
   "each chat only searches the documents you uploaded into that chat.";
 
 export const DOC_UPLOAD =
-  "On upload we extract the text, split it into overlapping chunks, embed each " +
-  "chunk, and store the vectors in Postgres with pgvector. Later questions " +
-  "search those chunks by similarity instead of rereading the whole file.";
+  "On upload we extract text (page-aware for PDFs), split it into paragraph-aware " +
+  "overlapping chunks, embed each chunk, and store vectors in Postgres with pgvector. " +
+  "Questions use hybrid search (vector + full-text), a score floor, and optional LLM " +
+  "reranking — not a full re-read of every file.";
 
 export const MODEL_PICKER =
   "Auto looks at the wording of the question and picks a configured provider. " +
@@ -29,8 +30,9 @@ export const CHAT_SESSIONS =
   "topics — a resume thread will not pull chunks from a policy thread.";
 
 export const CITATIONS =
-  "Each card is a source the model actually saw — a document chunk or a web " +
-  "snippet. The score is similarity for retrieved chunks (higher is closer).";
+  "Each card is a source the model actually saw — a document chunk (with page when " +
+  "known) or a web snippet. The score reflects retrieval ranking after hybrid search " +
+  "and optional rerank (higher is stronger).";
 
 export type AnswerExplainer = {
   title: string;
