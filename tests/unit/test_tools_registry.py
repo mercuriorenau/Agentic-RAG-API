@@ -22,13 +22,38 @@ async def test_unknown_tool() -> None:
 
 
 @pytest.mark.asyncio
-async def test_retrieve_requires_query() -> None:
+async def test_retrieve_empty_returns_no_citations() -> None:
+    rag = AsyncMock()
+    rag.retrieve.return_value = []
     result = await execute_tool(
         "retrieve_documents",
-        {"query": "  "},
-        ToolContext(user=MagicMock(), rag_service=AsyncMock()),
+        {"query": "mars colony protocol"},
+        ToolContext(user=MagicMock(), rag_service=rag),
     )
-    assert "non-empty query" in result.content
+    assert "Do not invent document content" in result.content
+    assert result.citations == []
+
+
+@pytest.mark.asyncio
+async def test_retrieve_includes_page_number() -> None:
+    chunk = MagicMock()
+    chunk.id = "chunk-1"
+    chunk.chunk_index = 0
+    chunk.page_number = 3
+    chunk.content = "Refund within 30 days."
+    document = MagicMock()
+    document.id = "doc-1"
+    document.filename = "policy.pdf"
+    item = MagicMock(chunk=chunk, document=document, score=0.91)
+    rag = AsyncMock()
+    rag.retrieve.return_value = [item]
+    result = await execute_tool(
+        "retrieve_documents",
+        {"query": "refund"},
+        ToolContext(user=MagicMock(), rag_service=rag),
+    )
+    assert "page 3" in result.content
+    assert result.citations[0].page_number == 3
 
 
 @pytest.mark.asyncio

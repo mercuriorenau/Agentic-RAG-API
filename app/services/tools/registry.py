@@ -28,7 +28,9 @@ TOOL_SPECS: list[ToolSpec] = [
         name="retrieve_documents",
         description=(
             "Search the user's uploaded documents for passages relevant to the question. "
-            "Use this when the answer likely depends on uploaded files."
+            "Use this when the answer likely depends on uploaded files. "
+            "If it returns no relevant passages, tell the user the documents do not "
+            "contain the answer instead of inventing document content."
         ),
         parameters={
             "type": "object",
@@ -104,7 +106,15 @@ async def _retrieve_documents(arguments: dict[str, Any], context: ToolContext) -
         chat_id=context.chat_id,
     )
     if not retrieved:
-        return ToolResult(content="No relevant passages found in uploaded documents.")
+        return ToolResult(
+            content=(
+                "No relevant passages found in uploaded documents. "
+                "Do not invent document content or citations. "
+                "Tell the user the uploaded files do not appear to answer this question, "
+                "or use web_search / answer_directly if appropriate."
+            ),
+            citations=[],
+        )
 
     blocks: list[str] = []
     citations: list[Citation] = []
