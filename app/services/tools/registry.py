@@ -21,6 +21,7 @@ class ToolContext:
 class ToolResult:
     content: str
     citations: list[Citation] = field(default_factory=list)
+    retrieval_trace: list[dict] = field(default_factory=list)
 
 
 TOOL_SPECS: list[ToolSpec] = [
@@ -106,6 +107,7 @@ async def _retrieve_documents(arguments: dict[str, Any], context: ToolContext) -
         chat_id=context.chat_id,
     )
     retrieved = result.chunks
+    trace = result.trace.to_dicts()
     if not retrieved:
         return ToolResult(
             content=(
@@ -115,6 +117,7 @@ async def _retrieve_documents(arguments: dict[str, Any], context: ToolContext) -
                 "or use web_search / answer_directly if appropriate."
             ),
             citations=[],
+            retrieval_trace=trace,
         )
 
     blocks: list[str] = []
@@ -137,7 +140,15 @@ async def _retrieve_documents(arguments: dict[str, Any], context: ToolContext) -
                 score=round(item.score, 4),
             )
         )
-    return ToolResult(content="\n\n".join(blocks), citations=citations)
+
+    if len(trace) > 1:
+        attempt_lines = [
+            f"- try {index + 1}: grade={item['grade']} chunks={item['chunk_count']} query={item['query']}"
+            for index, item in enumerate(trace)
+        ]
+        blocks.insert(0, "Self-RAG retrieval attempts:\n" + "\n".join(attempt_lines))
+
+    return ToolResult(content="\n\n".join(blocks), citations=citations, retrieval_trace=trace)
 
 
 async def _web_search(arguments: dict[str, Any], context: ToolContext) -> ToolResult:

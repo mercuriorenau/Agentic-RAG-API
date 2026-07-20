@@ -48,3 +48,4 @@ class QueryResponse(BaseModel):
     model_provider: str = "openai"
     model_name: str = ""
     model_selection_explanation: str = ""
+    retrieval_trace: list[dict] | None = None
