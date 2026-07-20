@@ -195,7 +195,7 @@ After changing chunking settings, **re-upload documents** so chunks and embeddin
 | `LLM_PROVIDER` | `openai` or `anthropic` | `openai` |
 | `EMBEDDING_MODEL` | Embedding model | `text-embedding-3-small` |
 | `CHAT_MODEL` | OpenAI chat model | `gpt-4o` |
-| `ANTHROPIC_CHAT_MODEL` | Anthropic chat model | `claude-sonnet-4-20250514` |
+| `ANTHROPIC_CHAT_MODEL` | Anthropic chat model | `claude-sonnet-4-5` |
 | `CHUNK_SIZE` | Characters per chunk | `800` |
 | `CHUNK_OVERLAP` | Chunk overlap | `100` |
 | `TOP_K` | Final chunks passed to the agent | `5` |

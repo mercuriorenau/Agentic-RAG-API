@@ -133,12 +133,12 @@ async def test_agent_honors_user_selected_anthropic_model() -> None:
         MagicMock(id="u1"),
         "Explain the tradeoffs.",
         model_mode="anthropic",
-        model_name="claude-sonnet-4-20250514",
+        model_name="claude-sonnet-4-5",
     )
 
     assert response.model_mode == "anthropic"
     assert response.model_provider == "anthropic"
-    assert response.model_name == "claude-sonnet-4-20250514"
+    assert response.model_name == "claude-sonnet-4-5"
 
 
 @pytest.mark.asyncio

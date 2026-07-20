@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     upload_dir: str = "./uploads"
     embedding_model: str = "text-embedding-3-small"
     chat_model: str = "gpt-4o"
-    anthropic_chat_model: str = "claude-sonnet-4-20250514"
+    anthropic_chat_model: str = "claude-sonnet-4-5"
     chunk_size: int = 800
     chunk_overlap: int = 100
     top_k: int = 5

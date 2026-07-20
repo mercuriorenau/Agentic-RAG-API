@@ -59,7 +59,7 @@ async def test_anthropic_provider_parses_tool_use() -> None:
     from app.services.llm.anthropic_provider import AnthropicProvider
 
     provider = AnthropicProvider(
-        Settings(anthropic_api_key="k", anthropic_chat_model="claude-sonnet-4-20250514")
+        Settings(anthropic_api_key="k", anthropic_chat_model="claude-sonnet-4-5")
     )
     provider.client = AsyncMock()
     text_block = MagicMock()
