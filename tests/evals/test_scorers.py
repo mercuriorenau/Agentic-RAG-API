@@ -41,8 +41,9 @@ def test_route_match() -> None:
 
 def test_cases_file_loads() -> None:
     cases = load_cases()
-    assert len(cases) >= 4
+    assert len(cases) >= 8
     assert Path("evals/cases.json").exists()
+    assert Path("evals/fixtures/policy.md").exists()
 
 
 def test_offline_eval_suite_passes() -> None:
@@ -58,3 +59,10 @@ def test_cases_json_is_valid() -> None:
         assert "id" in case
         assert "question" in case
         assert "expected_route" in case
+        assert "fixtures" in case
+
+
+def test_run_evals_offline_cli() -> None:
+    from evals.run_evals import main
+
+    assert main([]) == 0

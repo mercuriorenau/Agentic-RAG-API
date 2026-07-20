@@ -4,6 +4,7 @@
     "question": "What is the refund policy?",
     "expected_route": "retrieve",
     "expected_keywords": ["refund", "30", "days"],
+    "fixtures": ["policy.md"],
     "context_excerpts": [
       "Our refund policy allows returns within 30 days of purchase."
     ],
@@ -17,6 +18,7 @@
     "question": "Hello, how are you?",
     "expected_route": "direct",
     "expected_keywords": [],
+    "fixtures": [],
     "context_excerpts": [],
     "sample_answer": "Hello! I am doing well. How can I help you today?",
     "sample_retrieved": []
@@ -26,6 +28,7 @@
     "question": "What is the current weather in Paris right now?",
     "expected_route": "web",
     "expected_keywords": ["paris", "weather"],
+    "fixtures": [],
     "context_excerpts": [
       "Paris weather today: partly cloudy, 18 C."
     ],
@@ -37,6 +40,7 @@
     "question": "How long does standard shipping take?",
     "expected_route": "retrieve",
     "expected_keywords": ["shipping", "5", "business"],
+    "fixtures": ["policy.md"],
     "context_excerpts": [
       "Standard shipping takes 5-7 business days."
     ],
@@ -50,6 +54,7 @@
     "question": "What is the warranty period?",
     "expected_route": "retrieve",
     "expected_keywords": ["warranty"],
+    "fixtures": ["policy.md"],
     "context_excerpts": [
       "Products include a 12-month limited warranty."
     ],
@@ -57,6 +62,48 @@
     "sample_retrieved": [
       "Products include a 12-month limited warranty."
     ],
-    "expect_low_groundedness": true
+    "expect_low_groundedness": true,
+    "skip_live_agent": true
+  },
+  {
+    "id": "retrieve_lexical_sku",
+    "question": "What product is SKU-ALPHA-77?",
+    "expected_route": "retrieve",
+    "expected_keywords": ["SKU-ALPHA-77", "keyboard"],
+    "fixtures": ["catalog.md"],
+    "context_excerpts": [
+      "SKU-ALPHA-77 is the wireless keyboard with hot-swappable switches."
+    ],
+    "sample_answer": "SKU-ALPHA-77 is the wireless keyboard with hot-swappable switches.",
+    "sample_retrieved": [
+      "SKU-ALPHA-77 is the wireless keyboard with hot-swappable switches."
+    ]
+  },
+  {
+    "id": "retrieve_multi_doc",
+    "question": "How many remote days are allowed and how many PTO days do full-time staff get?",
+    "expected_route": "retrieve",
+    "expected_keywords": ["three", "remote", "20", "pto"],
+    "fixtures": ["handbook.md"],
+    "context_excerpts": [
+      "Employees may work remotely up to three days per week with manager approval.",
+      "Full-time staff receive 20 days of paid time off per calendar year."
+    ],
+    "sample_answer": "Remote work is allowed up to three days per week, and full-time staff get 20 PTO days.",
+    "sample_retrieved": [
+      "Employees may work remotely up to three days per week with manager approval.",
+      "Full-time staff receive 20 days of paid time off per calendar year."
+    ]
+  },
+  {
+    "id": "retrieve_no_relevant",
+    "question": "What is the company's mars colony evacuation protocol?",
+    "expected_route": "retrieve",
+    "expected_keywords": [],
+    "fixtures": ["policy.md"],
+    "expect_empty_retrieve": true,
+    "context_excerpts": [],
+    "sample_answer": "I do not find that information in the uploaded documents.",
+    "sample_retrieved": []
   }
 ]
