@@ -23,6 +23,9 @@ export function Citations({ citations }: Props) {
             <div className="citation-head">
               <span className="badge subtle">{citation.source_type}</span>
               {citation.document_name ? <strong>{citation.document_name}</strong> : null}
+              {citation.page_number != null ? (
+                <span className="muted">page {citation.page_number}</span>
+              ) : null}
               {citation.score != null ? (
                 <span className="muted">score {citation.score.toFixed(3)}</span>
               ) : null}

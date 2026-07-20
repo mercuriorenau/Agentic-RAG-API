@@ -33,6 +33,7 @@ class Citation(BaseModel):
     document_id: str | None = None
     document_name: str | None = None
     chunk_id: str | None = None
+    page_number: int | None = None
     excerpt: str
     score: float | None = None
     url: str | None = None

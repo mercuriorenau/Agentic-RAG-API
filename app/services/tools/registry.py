@@ -109,8 +109,11 @@ async def _retrieve_documents(arguments: dict[str, Any], context: ToolContext) -
     blocks: list[str] = []
     citations: list[Citation] = []
     for item in retrieved:
+        page = item.chunk.page_number
+        page_label = f" | page {page}" if page is not None else ""
         blocks.append(
-            f"[{item.document.filename} | chunk {item.chunk.chunk_index}]\n{item.chunk.content}"
+            f"[{item.document.filename} | chunk {item.chunk.chunk_index}{page_label}]\n"
+            f"{item.chunk.content}"
         )
         citations.append(
             Citation(
@@ -118,6 +121,7 @@ async def _retrieve_documents(arguments: dict[str, Any], context: ToolContext) -
                 document_id=str(item.document.id),
                 document_name=item.document.filename,
                 chunk_id=str(item.chunk.id),
+                page_number=page,
                 excerpt=item.chunk.content[:300],
                 score=round(item.score, 4),
             )
