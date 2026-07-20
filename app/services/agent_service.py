@@ -101,6 +101,7 @@ class AgentService:
         tools_used: list[str] = []
         citations: list[Citation] = []
         seen_citation_keys: set[str] = set()
+        retrieval_trace: list[dict] = []
 
         for _ in range(self.settings.agent_max_tool_rounds):
             result = await llm.chat_with_tools(messages, TOOL_SPECS)
@@ -125,6 +126,7 @@ class AgentService:
                     model_provider=selection.provider,
                     model_name=selection.model,
                     model_selection_explanation=selection.explanation,
+                    retrieval_trace=retrieval_trace or None,
                 )
 
             messages.append(
@@ -143,6 +145,8 @@ class AgentService:
                     if key not in seen_citation_keys:
                         seen_citation_keys.add(key)
                         citations.append(citation)
+                if tool_result.retrieval_trace:
+                    retrieval_trace = tool_result.retrieval_trace
                 messages.append(
                     ChatMessage(
                         role="tool",
@@ -170,6 +174,7 @@ class AgentService:
             model_provider=selection.provider,
             model_name=selection.model,
             model_selection_explanation=selection.explanation,
+            retrieval_trace=retrieval_trace or None,
         )
 
 

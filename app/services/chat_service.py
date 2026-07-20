@@ -111,6 +111,7 @@ class ChatService:
                     "model_provider": response.model_provider,
                     "model_name": response.model_name,
                     "model_selection_explanation": response.model_selection_explanation,
+                    "retrieval_trace": response.retrieval_trace,
                 },
             )
         )
