@@ -26,6 +26,8 @@ class Settings(BaseSettings):
     retrieval_min_score: float = 0.25
     rerank_enabled: bool = True
     rerank_model: str = "gpt-4o-mini"
+    self_rag_enabled: bool = True
+    self_rag_max_retries: int = 2
     agent_max_tool_rounds: int = 3
     conversation_history_max_turns: int = 6
     rate_limit_auth: str = "10/minute"
