@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import Settings, get_settings
 from app.models import Chunk, Document, User
 from app.services.embedding_service import EmbeddingService
+from app.services.rerank_service import LLMReranker
 
 
 @dataclass
@@ -37,10 +38,12 @@ class RAGService:
         db: AsyncSession,
         settings: Settings | None = None,
         embedding_service: EmbeddingService | None = None,
+        reranker: LLMReranker | None = None,
     ) -> None:
         self.db = db
         self.settings = settings or get_settings()
         self.embedding_service = embedding_service or EmbeddingService(self.settings)
+        self.reranker = reranker or LLMReranker(self.settings)
 
     async def retrieve(
         self,
@@ -105,7 +108,7 @@ class RAGService:
         if not filtered:
             return []
 
-        return filtered[: self.settings.top_k]
+        return await self._rerank(question, filtered)
 
     async def _dense_retrieve(
         self,
@@ -170,3 +173,20 @@ class RAGService:
             .join(Document, Chunk.document_id == Document.id)
             .where(*filters)
         )
+
+    async def _rerank(
+        self,
+        question: str,
+        candidates: list[RetrievedChunk],
+    ) -> list[RetrievedChunk]:
+        if not self.settings.rerank_enabled:
+            return candidates[: self.settings.top_k]
+
+        order = await self.reranker.rank_indices(
+            question,
+            [item.chunk.content for item in candidates],
+        )
+        if order is None:
+            return candidates[: self.settings.top_k]
+        reranked = [candidates[i] for i in order if 0 <= i < len(candidates)]
+        return reranked[: self.settings.top_k]
