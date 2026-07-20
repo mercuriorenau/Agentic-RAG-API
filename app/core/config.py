@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     chunk_size: int = 800
     chunk_overlap: int = 100
     top_k: int = 5
+    candidate_multiplier: int = 4
+    retrieval_min_score: float = 0.25
     agent_max_tool_rounds: int = 3
     conversation_history_max_turns: int = 6
     rate_limit_auth: str = "10/minute"
