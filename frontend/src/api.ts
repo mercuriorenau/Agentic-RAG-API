@@ -55,6 +55,7 @@ export type QueryResponse = {
   model_provider: string;
   model_name: string;
   model_selection_explanation: string;
+  retrieval_trace?: { query: string; grade: string; chunk_count: number }[] | null;
 };
 
 const TOKEN_KEY = "rag_access_token";
@@ -191,6 +192,7 @@ export function turnsFromMessages(
           model_provider: meta.model_provider || "openai",
           model_name: meta.model_name || "",
           model_selection_explanation: meta.model_selection_explanation || "",
+          retrieval_trace: meta.retrieval_trace || null,
         },
       });
       pending = null;

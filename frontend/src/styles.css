@@ -857,6 +857,37 @@ button.linkish.danger:hover:not(:disabled) {
 
 .citations a {
   color: var(--accent);
+}
+
+.retrieval-trace {
+  margin-top: 0.85rem;
+}
+
+.retrieval-trace h3 {
+  margin: 0 0 0.45rem;
+  font-size: 0.95rem;
+}
+
+.retrieval-trace ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.retrieval-trace li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  align-items: baseline;
+  font-size: 0.88rem;
+}
+
+.retrieval-trace-query {
+  color: var(--muted);
+  word-break: break-word;
+}
   word-break: break-all;
   font-size: 0.85rem;
 }
