@@ -27,6 +27,7 @@ import { Citations } from "./components/Citations";
 import { DocumentPanel } from "./components/DocumentPanel";
 import { AnswerExplainerBlock, Explainer } from "./components/Explainer";
 import { ProductTour, TourMode } from "./components/ProductTour";
+import { RetrievalTrace } from "./components/RetrievalTrace";
 import { TourLauncher } from "./components/TourLauncher";
 import {
   CHAT_SESSIONS,
@@ -476,6 +477,7 @@ export default function App() {
                     </div>
                     <p className="answer">{turn.response.answer}</p>
                     <Citations citations={turn.response.citations} />
+                    <RetrievalTrace attempts={turn.response.retrieval_trace} />
                   </article>
                 );
               })
