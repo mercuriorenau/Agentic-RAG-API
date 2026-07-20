@@ -3,6 +3,7 @@
 Usage:
     python -m evals.run_evals
     python -m evals.run_evals --live
+    python -m evals.run_evals --live --judge
 """
 
 from __future__ import annotations
@@ -40,7 +41,6 @@ def evaluate_case(case: dict) -> dict:
     route_ok = route >= 0.5
 
     if case.get("expect_empty_retrieve") and case.get("mode") != "live":
-        # Offline: canned empty retrieve should pass with empty sample_retrieved.
         relevance_ok = len(retrieved) == 0
         groundedness_ok = True
         route_ok = True
@@ -52,7 +52,37 @@ def evaluate_case(case: dict) -> dict:
         "relevance": round(relevance, 3),
         "groundedness": round(groundedness, 3),
         "route": round(route, 3),
+        "_question": case.get("question") or "",
+        "_answer": answer,
+        "_context": context,
+        "_expect_low": expect_low,
     }
+
+
+async def _attach_judge_scores(results: list[dict]) -> list[dict]:
+    from evals.judges import judge_answer
+
+    enriched: list[dict] = []
+    for item in results:
+        row = {k: v for k, v in item.items() if not k.startswith("_")}
+        if item.get("_expect_low"):
+            row["faithfulness"] = None
+            row["answer_relevance"] = None
+            enriched.append(row)
+            continue
+
+        scores = await judge_answer(
+            item.get("_question") or "",
+            item.get("_answer") or "",
+            item.get("_context") or [],
+        )
+        faithfulness = scores["faithfulness"]
+        answer_relevance = scores["answer_relevance"]
+        row["faithfulness"] = round(faithfulness, 3)
+        row["answer_relevance"] = round(answer_relevance, 3)
+        row["passed"] = bool(row["passed"]) and faithfulness >= 0.5 and answer_relevance >= 0.5
+        enriched.append(row)
+    return enriched
 
 
 def _print_results(results: list[dict], label: str) -> int:
@@ -62,7 +92,12 @@ def _print_results(results: list[dict], label: str) -> int:
         status = "PASS" if item["passed"] else "FAIL"
         extra = ""
         if "retrieved_count" in item:
-            extra = f" retrieved={item['retrieved_count']}"
+            extra += f" retrieved={item['retrieved_count']}"
+        if item.get("faithfulness") is not None:
+            extra += (
+                f" faithfulness={item['faithfulness']}"
+                f" answer_relevance={item['answer_relevance']}"
+            )
         print(
             f"[{status}] {item['id']} "
             f"relevance={item['relevance']} "
@@ -79,17 +114,30 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Seed fixtures and score against the real retrieve (+ agent) path",
     )
+    parser.add_argument(
+        "--judge",
+        action="store_true",
+        help="Add LLM-as-judge faithfulness / answer_relevance scores (needs OPENAI_API_KEY)",
+    )
     args = parser.parse_args(argv)
     cases = load_cases()
 
-    if not args.live:
+    if args.live:
+        from evals.live_runner import run_live_evals
+
+        results = asyncio.run(run_live_evals(cases, evaluate_case))
+        label = "Live evals"
+    else:
         results = [evaluate_case(case) for case in cases]
-        return _print_results(results, "Evals")
+        label = "Evals"
 
-    from evals.live_runner import run_live_evals
+    if args.judge:
+        results = asyncio.run(_attach_judge_scores(results))
+        label = f"{label} + judge"
 
-    results = asyncio.run(run_live_evals(cases, evaluate_case))
-    return _print_results(results, "Live evals")
+    # Strip private keys before print/return bookkeeping
+    cleaned = [{k: v for k, v in item.items() if not k.startswith("_")} for item in results]
+    return _print_results(cleaned, label)
 
 
 if __name__ == "__main__":

@@ -41,7 +41,7 @@ def test_route_match() -> None:
 
 def test_cases_file_loads() -> None:
     cases = load_cases()
-    assert len(cases) >= 8
+    assert len(cases) >= 9
     assert Path("evals/cases.json").exists()
     assert Path("evals/fixtures/policy.md").exists()
 

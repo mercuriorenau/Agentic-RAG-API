@@ -105,5 +105,19 @@
     "context_excerpts": [],
     "sample_answer": "I do not find that information in the uploaded documents.",
     "sample_retrieved": []
+  },
+  {
+    "id": "retrieve_paraphrase_return_window",
+    "question": "If I bought something last month, can I still send it back?",
+    "expected_route": "retrieve",
+    "expected_keywords": ["refund", "30", "days"],
+    "fixtures": ["policy.md"],
+    "context_excerpts": [
+      "Our refund policy allows returns within 30 days of purchase."
+    ],
+    "sample_answer": "Yes — returns are allowed within 30 days of purchase.",
+    "sample_retrieved": [
+      "Our refund policy allows returns within 30 days of purchase."
+    ]
   }
 ]
