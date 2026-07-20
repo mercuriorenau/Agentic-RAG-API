@@ -88,8 +88,8 @@ async def _evaluate_live_case(
 
         if fixture_names or case.get("expected_route") == "retrieve":
             rag = RAGService(session, settings=settings)
-            retrieved = await rag.retrieve(user, case["question"], chat_id=chat.id)
-            retrieved_texts = [item.chunk.content for item in retrieved]
+            retrieval = await rag.retrieve(user, case["question"], chat_id=chat.id)
+            retrieved_texts = [item.chunk.content for item in retrieval.chunks]
 
         expect_empty = bool(case.get("expect_empty_retrieve"))
         if expect_empty:

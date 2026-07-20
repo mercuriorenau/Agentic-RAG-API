@@ -24,7 +24,7 @@ async def test_unknown_tool() -> None:
 @pytest.mark.asyncio
 async def test_retrieve_empty_returns_no_citations() -> None:
     rag = AsyncMock()
-    rag.retrieve.return_value = []
+    rag.retrieve.return_value = MagicMock(chunks=[])
     result = await execute_tool(
         "retrieve_documents",
         {"query": "mars colony protocol"},
@@ -46,7 +46,7 @@ async def test_retrieve_includes_page_number() -> None:
     document.filename = "policy.pdf"
     item = MagicMock(chunk=chunk, document=document, score=0.91)
     rag = AsyncMock()
-    rag.retrieve.return_value = [item]
+    rag.retrieve.return_value = MagicMock(chunks=[item])
     result = await execute_tool(
         "retrieve_documents",
         {"query": "refund"},

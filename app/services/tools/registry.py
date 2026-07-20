@@ -100,11 +100,12 @@ async def _retrieve_documents(arguments: dict[str, Any], context: ToolContext) -
     if not query:
         return ToolResult(content="retrieve_documents requires a non-empty query.")
 
-    retrieved = await context.rag_service.retrieve(
+    result = await context.rag_service.retrieve(
         context.user,
         query,
         chat_id=context.chat_id,
     )
+    retrieved = result.chunks
     if not retrieved:
         return ToolResult(
             content=(
