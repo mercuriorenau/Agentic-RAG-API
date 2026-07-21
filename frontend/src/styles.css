@@ -117,11 +117,50 @@ button.danger {
 
 .auth-panel {
   max-width: 26rem;
+  width: 100%;
+}
+
+.auth-screen {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 2rem 0 3rem;
+}
+
+.auth-screen-inner {
+  width: min(26rem, 100%);
+  display: grid;
+  gap: 1.25rem;
+  justify-items: stretch;
+}
+
+.auth-hero {
+  text-align: center;
+  margin-bottom: 0;
+}
+
+.auth-hero .label-with-note {
+  justify-content: center;
+}
+
+.auth-hero h1 {
+  font-size: clamp(1.6rem, 4vw, 2.1rem);
+}
+
+.auth-hero .lede {
+  margin-inline: auto;
+}
+
+.auth-banner {
+  margin-top: 0.25rem;
 }
 
 .google-btn {
-  display: block;
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
   text-decoration: none;
   margin: 0 0 0.45rem;
   padding: 0.7rem 1rem;
@@ -131,6 +170,11 @@ button.danger {
   background: var(--surface);
   font-weight: 600;
   box-shadow: var(--shadow-soft);
+}
+
+.google-btn-icon {
+  display: inline-flex;
+  flex-shrink: 0;
 }
 
 .google-btn:hover {
