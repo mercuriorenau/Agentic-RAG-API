@@ -13,7 +13,7 @@ from app.models import Chat, User
 from app.services.agent_service import AgentService
 from app.services.document_service import DocumentService
 from app.services.rag_service import RAGService
-from evals.scorers import groundedness_score, retrieval_relevance_score, route_match
+from evals.scorers import retrieval_relevance_score
 
 FIXTURES_DIR = Path(__file__).with_name("fixtures")
 

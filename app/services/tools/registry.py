@@ -143,7 +143,10 @@ async def _retrieve_documents(arguments: dict[str, Any], context: ToolContext) -
 
     if len(trace) > 1:
         attempt_lines = [
-            f"- try {index + 1}: grade={item['grade']} chunks={item['chunk_count']} query={item['query']}"
+            (
+                f"- try {index + 1}: grade={item['grade']} "
+                f"chunks={item['chunk_count']} query={item['query']}"
+            )
             for index, item in enumerate(trace)
         ]
         blocks.insert(0, "Self-RAG retrieval attempts:\n" + "\n".join(attempt_lines))
