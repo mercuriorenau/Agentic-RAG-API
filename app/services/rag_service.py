@@ -171,7 +171,9 @@ class RAGService:
 
         rrf_scores = reciprocal_rank_fusion([dense_ids, lexical_ids])
         fused: list[RetrievedChunk] = []
-        for chunk_id, rrf_score in sorted(rrf_scores.items(), key=lambda item: item[1], reverse=True):
+        for chunk_id, rrf_score in sorted(
+            rrf_scores.items(), key=lambda item: item[1], reverse=True
+        ):
             chunk, document, dense_score, lexical_score = by_id[chunk_id]
             display_score = dense_score if dense_score is not None else (lexical_score or rrf_score)
             fused.append(RetrievedChunk(chunk=chunk, document=document, score=float(display_score)))
