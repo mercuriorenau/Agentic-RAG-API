@@ -119,6 +119,30 @@ button.danger {
   max-width: 26rem;
 }
 
+.google-btn {
+  display: block;
+  text-align: center;
+  text-decoration: none;
+  margin: 0 0 0.45rem;
+  padding: 0.7rem 1rem;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  color: var(--ink);
+  background: var(--surface);
+  font-weight: 600;
+  box-shadow: var(--shadow-soft);
+}
+
+.google-btn:hover {
+  border-color: var(--accent);
+}
+
+.auth-divider {
+  text-align: center;
+  margin: 0.2rem 0 0.85rem;
+  font-size: 0.85rem;
+}
+
 .tabs {
   display: grid;
   grid-template-columns: 1fr 1fr;

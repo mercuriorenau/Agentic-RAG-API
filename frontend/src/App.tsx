@@ -19,6 +19,8 @@ import {
   ModelOption,
   QueryResponse,
   register,
+  setToken,
+  setUserKey as persistUserKey,
   turnsFromMessages,
   uploadDocument,
 } from "./api";
@@ -96,6 +98,27 @@ export default function App() {
       models.some((model) => model.id === current) ? current : "auto",
     );
   }
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get("auth_token");
+    const email = params.get("auth_email");
+    const authError = params.get("auth_error");
+    if (authError) {
+      setError(authError);
+      window.history.replaceState({}, "", window.location.pathname);
+      return;
+    }
+    if (token) {
+      setToken(token);
+      if (email) {
+        persistUserKey(email);
+        setUserKey(email.toLowerCase());
+      }
+      setAuthed(true);
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, []);
 
   useEffect(() => {
     refreshModels().catch((err: Error) => setError(err.message));

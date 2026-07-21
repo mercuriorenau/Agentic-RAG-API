@@ -36,6 +36,10 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     max_upload_size_mb: int = 10
     static_dir: str = "./frontend/dist"
+    google_client_id: str = ""
+    google_client_secret: str = ""
+    google_redirect_uri: str = "http://localhost:8000/api/v1/auth/google/callback"
+    app_public_url: str = "http://localhost:8000"
 
     @property
     def max_upload_size_bytes(self) -> int:

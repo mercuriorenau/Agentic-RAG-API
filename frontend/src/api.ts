@@ -79,7 +79,7 @@ export function getUserKey(): string | null {
   return sessionStorage.getItem(USER_EMAIL_KEY);
 }
 
-function setUserKey(email: string): void {
+export function setUserKey(email: string): void {
   sessionStorage.setItem(USER_EMAIL_KEY, email.toLowerCase());
 }
 
@@ -121,6 +121,10 @@ async function request<T>(
     return undefined as T;
   }
   return response.json() as Promise<T>;
+}
+
+export function getGoogleLoginUrl(): string {
+  return "/api/v1/auth/google";
 }
 
 export async function register(email: string, password: string): Promise<void> {
