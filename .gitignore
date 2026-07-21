@@ -38,6 +38,8 @@ frontend/dist/
 
 .idea/
 .vscode/
+.cursor/
+.githooks/
 *.swp
 *.swo
 .DS_Store
