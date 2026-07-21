@@ -1,0 +1,29 @@
+"""Add Google OAuth fields to users.
+
+Revision ID: 004_google_oauth
+Revises: 003_chunk_page
+Create Date: 2026-07-21
+"""
+
+from collections.abc import Sequence
+
+import sqlalchemy as sa
+
+from alembic import op
+
+revision: str = "004_google_oauth"
+down_revision: str | None = "003_chunk_page"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
+
+
+def upgrade() -> None:
+    op.alter_column("users", "hashed_password", existing_type=sa.String(length=255), nullable=True)
+    op.add_column("users", sa.Column("google_sub", sa.String(length=255), nullable=True))
+    op.create_index(op.f("ix_users_google_sub"), "users", ["google_sub"], unique=True)
+
+
+def downgrade() -> None:
+    op.drop_index(op.f("ix_users_google_sub"), table_name="users")
+    op.drop_column("users", "google_sub")
+    op.alter_column("users", "hashed_password", existing_type=sa.String(length=255), nullable=False)

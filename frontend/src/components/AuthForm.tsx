@@ -1,4 +1,5 @@
 import { FormEvent, useState } from "react";
+import { getGoogleLoginUrl } from "../api";
 
 type Props = {
   busy: boolean;
@@ -34,6 +35,10 @@ export function AuthForm({ busy, error, onSubmit }: Props) {
           Create account
         </button>
       </div>
+      <a className="google-btn" href={getGoogleLoginUrl()}>
+        Continue with Google
+      </a>
+      <p className="auth-divider muted">or use email</p>
       <form onSubmit={handleSubmit} className="stack">
         <label>
           Email
