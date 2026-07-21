@@ -321,19 +321,21 @@ export default function App() {
 
   if (!authed) {
     return (
-      <div className="shell">
-        <header className="hero">
-          <div className="label-with-note">
-            <p className="brand">Agentic RAG</p>
-            <Explainer summary="About this demo">{INTRO}</Explainer>
-          </div>
-          <h1>Ask your documents. Trace every answer.</h1>
-          <p className="lede">
-            Upload files, then let an agent choose retrieval, web search, or a direct answer —
-            with citations you can verify.
-          </p>
-        </header>
-        <AuthForm busy={busy} error={error} onSubmit={handleAuth} />
+      <div className="shell auth-screen">
+        <div className="auth-screen-inner">
+          <header className="hero auth-hero">
+            <div className="label-with-note">
+              <p className="brand">Agentic RAG</p>
+              <Explainer summary="About this demo">{INTRO}</Explainer>
+            </div>
+            <h1>Ask your documents. Trace every answer.</h1>
+            <p className="lede">
+              Upload files, then let an agent choose retrieval, web search, or a direct answer —
+              with citations you can verify.
+            </p>
+          </header>
+          <AuthForm busy={busy} error={error} onSubmit={handleAuth} />
+        </div>
       </div>
     );
   }
