@@ -43,10 +43,17 @@ export const CONVERSATION_MEMORY =
   "for a clean slate.";
 
 export const CHAT_SESSIONS =
-  "Each chat keeps its own documents and message history. Switch chats to isolate " +
-  "topics — a resume thread will not pull chunks from a policy thread.";
+  "The front of this card is your active workspace (title + documents). Use the U-turn " +
+  "control to flip to the chat list on the back. If you delete your last chat, you stay " +
+  "on the front and can create a new one without flipping. Each chat keeps its own files " +
+  "and history so threads never mix retrieval contexts.";
 
+export const CHAT_HISTORY =
+  "Past chats live on the back of the card. Create a New chat here, or select one to " +
+  "flip back to its documents. You can delete every chat — including the last one — " +
+  "then create again from the front prompt.";
 
+export const CITATIONS =
   "Each card is a source the model actually saw — a document chunk (with page when " +
   "known) or a web snippet. The score reflects retrieval ranking after hybrid search " +
   "and optional rerank (higher is stronger). Retrieval attempts may show adaptive top_k.";

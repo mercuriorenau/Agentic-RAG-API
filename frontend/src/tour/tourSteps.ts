@@ -19,10 +19,11 @@ export const TOUR_INVITE = {
 export const TOUR_STEPS: TourStep[] = [
   {
     id: "chats",
-    title: "Chats are workspaces",
+    title: "Flip for chat history",
     body:
-      "Create a chat per topic. Documents and message history stay scoped to that chat, so retrieval never mixes contexts.",
-    target: '[data-tour="new-chat"]',
+      "The front of the card is your active workspace. First-time users see Create new chat. " +
+      "Once you have chats, the U-turn control flips to the list on the back.",
+    target: '[data-tour="new-chat"], [data-tour="chat-history"]',
   },
   {
     id: "documents",
