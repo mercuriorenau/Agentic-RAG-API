@@ -8,7 +8,7 @@ from app.core.config import Settings, get_settings
 from app.models import Chunk, Document, User
 from app.services.embedding_service import EmbeddingService
 from app.services.rerank_service import LLMReranker
-from app.services.retrieval_budget import resolve_top_k
+from app.services.retrieval_budget import resolve_retrieval_budget
 from app.services.self_rag import SelfRAGHelper, needs_retry
 
 
@@ -20,11 +20,26 @@ class RetrievedChunk:
 
 
 @dataclass
+class RetrievalPassResult:
+    chunks: list[RetrievedChunk]
+    candidate_count: int = 0
+    candidate_pool_limit: int = 0
+    rerank: str = "skipped"
+
+
+@dataclass
 class RetrievalAttempt:
     query: str
     grade: str
     chunk_count: int
     top_k: int = 0
+    top_k_base: int = 0
+    top_k_max: int = 0
+    ideal_top_k: int = 0
+    budget_capped: bool = False
+    candidate_count: int = 0
+    candidate_pool_limit: int = 0
+    rerank: str = "skipped"
 
 
 @dataclass
@@ -40,6 +55,13 @@ class RetrievalTrace:
                 "grade": item.grade,
                 "chunk_count": item.chunk_count,
                 "top_k": item.top_k,
+                "top_k_base": item.top_k_base,
+                "top_k_max": item.top_k_max,
+                "ideal_top_k": item.ideal_top_k,
+                "budget_capped": item.budget_capped,
+                "candidate_count": item.candidate_count,
+                "candidate_pool_limit": item.candidate_pool_limit,
+                "rerank": item.rerank,
             }
             for item in self.attempts
         ]
@@ -87,11 +109,15 @@ class RAGService:
         question: str,
         *,
         chat_id: uuid.UUID | None = None,
+        budget_question: str | None = None,
     ) -> RetrievalResult:
         trace = RetrievalTrace(final_query=question)
         query = question.strip()
         best_chunks: list[RetrievedChunk] = []
-        top_k = resolve_top_k(query, self.settings)
+        # Budget follows the user's ask (survey vs focused), not the tool/search rewrite.
+        budget_source = (budget_question or question).strip() or query
+        budget = resolve_retrieval_budget(budget_source, self.settings)
+        top_k = budget.top_k
         trace.top_k = top_k
 
         max_attempts = 1 + (
@@ -99,9 +125,10 @@ class RAGService:
         )
 
         for attempt_index in range(max_attempts):
-            chunks = await self._retrieve_once(
+            passed = await self._retrieve_once(
                 user, query, chat_id=chat_id, top_k=top_k
             )
+            chunks = passed.chunks
             passages = [item.chunk.content for item in chunks]
             if self.settings.self_rag_enabled:
                 grade = await self.self_rag.grade_evidence(query, passages)
@@ -114,6 +141,13 @@ class RAGService:
                     grade=grade,
                     chunk_count=len(chunks),
                     top_k=top_k,
+                    top_k_base=budget.top_k_base,
+                    top_k_max=budget.top_k_max,
+                    ideal_top_k=budget.ideal_top_k,
+                    budget_capped=budget.capped,
+                    candidate_count=passed.candidate_count,
+                    candidate_pool_limit=passed.candidate_pool_limit,
+                    rerank=passed.rerank,
                 )
             )
             trace.final_query = query
@@ -141,7 +175,7 @@ class RAGService:
         *,
         chat_id: uuid.UUID | None = None,
         top_k: int,
-    ) -> list[RetrievedChunk]:
+    ) -> RetrievalPassResult:
         query_embedding = await self.embedding_service.embed_query(question)
         return await self._retrieve_chunks(
             user, question, query_embedding, chat_id=chat_id, top_k=top_k
@@ -155,7 +189,7 @@ class RAGService:
         *,
         chat_id: uuid.UUID | None = None,
         top_k: int,
-    ) -> list[RetrievedChunk]:
+    ) -> RetrievalPassResult:
         candidate_limit = max(
             top_k * self.settings.candidate_multiplier,
             top_k,
@@ -184,7 +218,12 @@ class RAGService:
                 by_id[chunk.id] = (chunk, document, None, lexical_score)
 
         if not by_id:
-            return []
+            return RetrievalPassResult(
+                chunks=[],
+                candidate_count=0,
+                candidate_pool_limit=candidate_limit,
+                rerank="skipped",
+            )
 
         rrf_scores = reciprocal_rank_fusion([dense_ids, lexical_ids])
         fused: list[RetrievedChunk] = []
@@ -201,9 +240,20 @@ class RAGService:
             if item.score >= self.settings.retrieval_min_score
         ]
         if not filtered:
-            return []
+            return RetrievalPassResult(
+                chunks=[],
+                candidate_count=0,
+                candidate_pool_limit=candidate_limit,
+                rerank="skipped",
+            )
 
-        return await self._rerank(question, filtered, top_k=top_k)
+        chunks, rerank = await self._rerank(question, filtered, top_k=top_k)
+        return RetrievalPassResult(
+            chunks=chunks,
+            candidate_count=len(filtered),
+            candidate_pool_limit=candidate_limit,
+            rerank=rerank,
+        )
 
     async def _dense_retrieve(
         self,
@@ -274,15 +324,15 @@ class RAGService:
         candidates: list[RetrievedChunk],
         *,
         top_k: int,
-    ) -> list[RetrievedChunk]:
+    ) -> tuple[list[RetrievedChunk], str]:
         if not self.settings.rerank_enabled:
-            return candidates[:top_k]
+            return candidates[:top_k], "disabled"
 
         order = await self.reranker.rank_indices(
             question,
             [item.chunk.content for item in candidates],
         )
         if order is None:
-            return candidates[:top_k]
+            return candidates[:top_k], "fail_open"
         reranked = [candidates[i] for i in order if 0 <= i < len(candidates)]
-        return reranked[:top_k]
+        return reranked[:top_k], "applied"
