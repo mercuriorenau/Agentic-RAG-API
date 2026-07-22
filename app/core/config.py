@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     chunk_size: int = 800
     chunk_overlap: int = 100
     top_k: int = 5
+    top_k_max: int = 8
+    adaptive_top_k: bool = True
     candidate_multiplier: int = 4
     retrieval_min_score: float = 0.25
     rerank_enabled: bool = True

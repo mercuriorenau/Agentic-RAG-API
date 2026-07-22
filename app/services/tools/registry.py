@@ -6,6 +6,7 @@ from app.models import User
 from app.schemas.query import Citation
 from app.services.llm.base import ToolSpec
 from app.services.rag_service import RAGService
+from app.services.retrieval_budget import query_looks_broad
 from app.services.tools.web_search import web_search
 
 
@@ -30,6 +31,9 @@ TOOL_SPECS: list[ToolSpec] = [
         description=(
             "Search the user's uploaded documents for passages relevant to the question. "
             "Use this when the answer likely depends on uploaded files. "
+            "Retrieval returns a small adaptive budget of chunks (not the whole file) "
+            "to limit tokens — for long documents, prefer focused queries "
+            "(one case/section) over 'list everything'. "
             "If it returns no relevant passages, tell the user the documents do not "
             "contain the answer instead of inventing document content."
         ),
@@ -150,6 +154,26 @@ async def _retrieve_documents(arguments: dict[str, Any], context: ToolContext) -
             for index, item in enumerate(trace)
         ]
         blocks.insert(0, "Self-RAG retrieval attempts:\n" + "\n".join(attempt_lines))
+
+    used_k = trace[0].get("top_k") if trace else None
+    max_k = context.rag_service.settings.top_k_max
+    budget_note = (
+        f"Retrieval budget: returned {len(retrieved)} chunk(s)"
+        + (f" with adaptive top_k={used_k}" if used_k else "")
+        + f" (hard cap top_k_max={max_k}). "
+        "This demo intentionally does not load the entire document into the model. "
+    )
+    if query_looks_broad(query):
+        budget_note += (
+            "Broad questions may omit some sections — ask about one case or section "
+            "for fuller coverage. Incomplete survey answers are a token-cost limit, "
+            "not missing files."
+        )
+    else:
+        budget_note += (
+            "If a detail is missing, ask a narrower follow-up about that section."
+        )
+    blocks.append(budget_note)
 
     return ToolResult(content="\n\n".join(blocks), citations=citations, retrieval_trace=trace)
 
