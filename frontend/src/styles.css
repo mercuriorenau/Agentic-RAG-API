@@ -969,6 +969,10 @@ button.linkish.danger:hover:not(:disabled) {
   font-weight: 600;
 }
 
+.turn-coverage {
+  margin: 0 0 0.75rem;
+}
+
 .meta {
   display: flex;
   flex-wrap: wrap;

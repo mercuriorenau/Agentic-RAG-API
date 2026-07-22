@@ -28,6 +28,56 @@ export const DOC_SIZE_WARNING =
   "still work if you ask about one case or section at a time — incomplete “cover " +
   "everything” answers are an intentional cost limit, not a bug.";
 
+export const COVERAGE_LIMIT_TITLE = "Partial coverage — demo retrieval limit";
+
+export function coverageNotice(
+  response: QueryResponse,
+): { title: string; body: string } | null {
+  const attempts = response.retrieval_trace;
+  if (!attempts || attempts.length === 0) {
+    return null;
+  }
+  if (response.route !== "retrieve" && response.route !== "mixed") {
+    return null;
+  }
+
+  // Only survey-style asks set budget_capped. Filling top_k on a focused question
+  // (e.g. Caso 9 → 5/5) is normal and must NOT show this banner.
+  const cappedAttempt = [...attempts]
+    .reverse()
+    .find((item) => item.budget_capped);
+  if (!cappedAttempt) {
+    return null;
+  }
+
+  const topK = cappedAttempt.top_k ?? cappedAttempt.chunk_count;
+  const maxK = cappedAttempt.top_k_max ?? topK;
+  const ideal = cappedAttempt.ideal_top_k;
+  const filled =
+    typeof cappedAttempt.top_k === "number" &&
+    cappedAttempt.chunk_count >= cappedAttempt.top_k;
+
+  let body =
+    `This was a broad / survey-style question. Each search kept at most top_k=${topK} ` +
+    `passages (hard cap TOP_K_MAX=${maxK}), not the whole file. `;
+  if (filled) {
+    body +=
+      `The budget was fully used (${cappedAttempt.chunk_count}/${topK}), so other sections ` +
+      `in the upload may be missing from this answer. `;
+  } else {
+    body +=
+      `Coverage can still be incomplete when searches keep hitting the same passages. `;
+  }
+  if (ideal && topK && ideal > topK) {
+    body += `A fuller survey would want about top_k=${ideal}, but this demo caps retrieve to control API cost. `;
+  }
+  body +=
+    `That is an intentional limit — not a broken index. Ask about one case or section ` +
+    `(e.g. “Caso 3 Lidl”) for detail the survey may have skipped.`;
+
+  return { title: COVERAGE_LIMIT_TITLE, body };
+}
+
 export const MODEL_PICKER =
   "Auto inspects the question and picks OpenAI or Anthropic from the configured catalog. " +
   "Or lock a provider/model yourself. Either way, the agent still chooses tools: " +
