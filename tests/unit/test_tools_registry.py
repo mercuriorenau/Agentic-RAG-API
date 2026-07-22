@@ -2,7 +2,19 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from app.core.config import Settings
+from app.services.rag_service import RetrievalAttempt, RetrievalResult, RetrievalTrace
 from app.services.tools.registry import ToolContext, execute_tool
+
+
+def _empty_trace(query: str = "q") -> RetrievalTrace:
+    return RetrievalTrace(
+        attempts=[
+            RetrievalAttempt(query=query, grade="irrelevant", chunk_count=0, top_k=5, top_k_max=8)
+        ],
+        final_query=query,
+        top_k=5,
+    )
 
 
 @pytest.mark.asyncio
@@ -24,7 +36,11 @@ async def test_unknown_tool() -> None:
 @pytest.mark.asyncio
 async def test_retrieve_empty_returns_no_citations() -> None:
     rag = AsyncMock()
-    rag.retrieve.return_value = MagicMock(chunks=[])
+    rag.settings = Settings(openai_api_key="test")
+    rag.retrieve.return_value = RetrievalResult(
+        chunks=[],
+        trace=_empty_trace("mars colony protocol"),
+    )
     result = await execute_tool(
         "retrieve_documents",
         {"query": "mars colony protocol"},
@@ -46,7 +62,28 @@ async def test_retrieve_includes_page_number() -> None:
     document.filename = "policy.pdf"
     item = MagicMock(chunk=chunk, document=document, score=0.91)
     rag = AsyncMock()
-    rag.retrieve.return_value = MagicMock(chunks=[item])
+    rag.settings = Settings(openai_api_key="test")
+    rag.retrieve.return_value = RetrievalResult(
+        chunks=[item],
+        trace=RetrievalTrace(
+            attempts=[
+                RetrievalAttempt(
+                    query="refund",
+                    grade="sufficient",
+                    chunk_count=1,
+                    top_k=5,
+                    top_k_base=5,
+                    top_k_max=8,
+                    ideal_top_k=5,
+                    budget_capped=False,
+                    candidate_count=1,
+                    rerank="disabled",
+                )
+            ],
+            final_query="refund",
+            top_k=5,
+        ),
+    )
     result = await execute_tool(
         "retrieve_documents",
         {"query": "refund"},
