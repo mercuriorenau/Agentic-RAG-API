@@ -60,6 +60,13 @@ export type QueryResponse = {
     grade: string;
     chunk_count: number;
     top_k?: number;
+    top_k_base?: number;
+    top_k_max?: number;
+    ideal_top_k?: number;
+    budget_capped?: boolean;
+    candidate_count?: number;
+    candidate_pool_limit?: number;
+    rerank?: "applied" | "disabled" | "fail_open" | "skipped" | string;
   }[] | null;
 };
 

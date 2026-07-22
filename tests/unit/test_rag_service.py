@@ -117,6 +117,8 @@ async def test_retrieve_uses_reranker_order() -> None:
 
     result = await service.retrieve(MagicMock(), "beta first")
     assert [item.chunk.id for item in result.chunks] == [chunk_b.id, chunk_a.id]
+    assert result.trace.attempts[-1].rerank == "applied"
+    assert result.trace.attempts[-1].candidate_count == 2
 
 
 @pytest.mark.asyncio
@@ -137,6 +139,7 @@ async def test_retrieve_fail_open_when_rerank_returns_none() -> None:
     result = await service.retrieve(MagicMock(), "keep")
     assert len(result.chunks) == 1
     assert result.chunks[0].chunk.id == chunk.id
+    assert result.trace.attempts[-1].rerank == "fail_open"
 
 
 @pytest.mark.asyncio

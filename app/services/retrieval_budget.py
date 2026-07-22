@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 
 from app.core.config import Settings
 
@@ -39,6 +40,17 @@ _COMPARE_PATTERNS: tuple[re.Pattern[str], ...] = tuple(
 )
 
 
+@dataclass(frozen=True)
+class RetrievalBudget:
+    """Resolved retrieve budget for one question."""
+
+    top_k: int
+    top_k_base: int
+    top_k_max: int
+    ideal_top_k: int
+    capped: bool
+
+
 def query_looks_broad(question: str) -> bool:
     text = question.strip()
     if not text:
@@ -53,15 +65,53 @@ def query_looks_comparative(question: str) -> bool:
     return any(pattern.search(text) for pattern in _COMPARE_PATTERNS)
 
 
-def resolve_top_k(question: str, settings: Settings) -> int:
+def resolve_retrieval_budget(question: str, settings: Settings) -> RetrievalBudget:
     """Pick top_k for this question. Always within [1, top_k_max]."""
     base = max(1, int(settings.top_k))
     cap = max(base, int(settings.top_k_max))
+
     if not settings.adaptive_top_k:
-        return min(base, cap)
+        top_k = min(base, cap)
+        return RetrievalBudget(
+            top_k=top_k,
+            top_k_base=base,
+            top_k_max=cap,
+            ideal_top_k=top_k,
+            capped=False,
+        )
 
     if query_looks_broad(question):
-        return cap
+        # Survey prompts want wider coverage than the demo cap allows.
+        ideal = max(cap * 2, 16)
+        return RetrievalBudget(
+            top_k=cap,
+            top_k_base=base,
+            top_k_max=cap,
+            ideal_top_k=ideal,
+            capped=ideal > cap,
+        )
+
     if query_looks_comparative(question):
-        return min(cap, base + 2)
-    return min(base, cap)
+        ideal = base + 2
+        top_k = min(cap, ideal)
+        return RetrievalBudget(
+            top_k=top_k,
+            top_k_base=base,
+            top_k_max=cap,
+            ideal_top_k=ideal,
+            capped=ideal > cap,
+        )
+
+    top_k = min(base, cap)
+    return RetrievalBudget(
+        top_k=top_k,
+        top_k_base=base,
+        top_k_max=cap,
+        ideal_top_k=top_k,
+        capped=False,
+    )
+
+
+def resolve_top_k(question: str, settings: Settings) -> int:
+    """Pick top_k for this question. Always within [1, top_k_max]."""
+    return resolve_retrieval_budget(question, settings).top_k
