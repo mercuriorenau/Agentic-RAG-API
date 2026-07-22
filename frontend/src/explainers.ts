@@ -3,36 +3,53 @@ import type { QueryResponse } from "./api";
 /** Edit these strings freely — the UI imports from this file only. */
 
 export const INTRO =
-  "Sign in so your uploads stay under your account. The API uses JWT auth; " +
-  "each chat only searches the documents you uploaded into that chat.";
+  "Sign in with email or Google so uploads stay under your account (JWT sessions). " +
+  "Each chat only searches the documents you uploaded into that chat — never other threads.";
 
 export const DOC_UPLOAD =
   "On upload we extract text (page-aware for PDFs), split it into paragraph-aware " +
-  "overlapping chunks, embed each chunk, and store vectors in Postgres with pgvector. " +
-  "Questions use hybrid search (vector + full-text), a score floor, and optional LLM " +
-  "reranking — not a full re-read of every file.";
+  "overlapping chunks (~800 chars, 100 overlap), embed with text-embedding-3-small, " +
+  "and store vectors in Postgres with pgvector. Ask uses hybrid search (dense + full-text), " +
+  "RRF fusion, a score floor, optional LLM rerank, and Self-RAG grade/rewrite — " +
+  "not a full re-read of every file.";
+
+export const RETRIEVAL_BUDGET =
+  "Retrieval is adaptive but capped: focused questions use TOP_K (default 5); " +
+  "broad ones (e.g. “each case”, “summarize the document”) may rise toward TOP_K_MAX " +
+  "(default 8). That keeps demo token spend in check. Incomplete surveys of long PDFs " +
+  "are an intentional budget, not a broken index — ask one section at a time for detail.";
+
+/** Visible in-app warning — keep in sync with TOP_K_MAX / chunk defaults. */
+export const DOC_SIZE_WARNING_TITLE = "Retrieval budget warning";
+
+export const DOC_SIZE_WARNING =
+  "This demo retrieves at most ~8 passages per question (not the whole file) so API " +
+  "tokens stay bounded. Best results: PDFs or notes under about 15 pages. Longer docs " +
+  "still work if you ask about one case or section at a time — incomplete “cover " +
+  "everything” answers are an intentional cost limit, not a bug.";
 
 export const MODEL_PICKER =
-  "Auto looks at the wording of the question and picks a configured provider. " +
-  "Or lock OpenAI / Anthropic (and a specific model) yourself. Either way, the " +
-  "agent still chooses tools: retrieve documents, web search, or answer directly.";
+  "Auto inspects the question and picks OpenAI or Anthropic from the configured catalog. " +
+  "Or lock a provider/model yourself. Either way, the agent still chooses tools: " +
+  "retrieve documents, Tavily web search, or answer directly.";
 
 export const COST_GUARDRAIL =
-  "Demo limit: 600 characters per question and 3 asks per IP per day. " +
-  "That keeps public traffic from burning through API credits.";
+  "Demo limits: 600 characters per question and 3 asks per IP per day, plus the " +
+  "retrieval chunk cap above. That keeps public traffic from burning through API credits.";
 
 export const CONVERSATION_MEMORY =
   "Follow-ups use the last few Q&A turns, so pronouns like \"he\" or \"that resume\" " +
-  "can refer to what you just discussed. Start a fresh question if you want a clean slate.";
+  "can refer to what you just discussed. Clear chat memory or start a fresh question " +
+  "for a clean slate.";
 
 export const CHAT_SESSIONS =
   "Each chat keeps its own documents and message history. Switch chats to isolate " +
   "topics — a resume thread will not pull chunks from a policy thread.";
 
-export const CITATIONS =
+
   "Each card is a source the model actually saw — a document chunk (with page when " +
   "known) or a web snippet. The score reflects retrieval ranking after hybrid search " +
-  "and optional rerank (higher is stronger).";
+  "and optional rerank (higher is stronger). Retrieval attempts may show adaptive top_k.";
 
 export type AnswerExplainer = {
   title: string;
@@ -68,6 +85,15 @@ export function explainAnswer(response: QueryResponse): AnswerExplainer {
     paragraphs.push(`Why this model. ${response.model_selection_explanation}`);
   }
 
+  if (response.retrieval_trace && response.retrieval_trace.length > 0) {
+    const last = response.retrieval_trace[response.retrieval_trace.length - 1];
+    paragraphs.push(
+      `Retrieval budget this turn: ${last.chunk_count} chunk(s)` +
+        (last.top_k ? ` with adaptive top_k=${last.top_k}` : "") +
+        ". Broad questions may miss sections on purpose — ask one case/section for more.",
+    );
+  }
+
   return {
     title: "What just happened",
     paragraphs,
@@ -78,8 +104,8 @@ function routeParagraph(route: string): string {
   switch (route) {
     case "retrieve":
       return (
-        "This question used document retrieval. The agent asked for relevant chunks, " +
-        "then wrote the answer from those passages."
+        "This question used document retrieval. The agent asked for relevant chunks " +
+        "(adaptive top_k, capped), then wrote the answer from those passages."
       );
     case "web":
       return (

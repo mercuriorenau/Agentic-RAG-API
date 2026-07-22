@@ -35,9 +35,12 @@ import {
   CHAT_SESSIONS,
   CONVERSATION_MEMORY,
   COST_GUARDRAIL,
+  DOC_SIZE_WARNING,
+  DOC_SIZE_WARNING_TITLE,
   explainAnswer,
   INTRO,
   MODEL_PICKER,
+  RETRIEVAL_BUDGET,
 } from "./explainers";
 import { clearTourComplete, hasCompletedTour, markTourComplete } from "./tour/tourStorage";
 
@@ -355,6 +358,7 @@ export default function App() {
       {error ? <div className="banner error">{error}</div> : null}
 
       <div className="workspace-grid">
+        <div className="chats-column">
         <aside className="panel chats-panel">
           <div className="panel-head">
             <div className="panel-title">
@@ -415,6 +419,11 @@ export default function App() {
             </ul>
           )}
         </aside>
+          <aside className="callout warning" role="status">
+            <strong>{DOC_SIZE_WARNING_TITLE}</strong>
+            <p>{DOC_SIZE_WARNING}</p>
+          </aside>
+        </div>
 
         <section className="panel ask-panel">
           <div className="panel-head">
@@ -422,7 +431,7 @@ export default function App() {
               <h2>Ask</h2>
               <Explainer
                 summary="How Ask works"
-                paragraphs={[COST_GUARDRAIL, CONVERSATION_MEMORY]}
+                paragraphs={[COST_GUARDRAIL, RETRIEVAL_BUDGET, CONVERSATION_MEMORY]}
               />
             </div>
             <button
