@@ -5,10 +5,8 @@ from app.core.config import Settings
 MODEL_MODES = {"auto", "openai", "anthropic"}
 
 OPENAI_MODELS = (
-    "gpt-4o",
-    "gpt-4o-mini",
     "gpt-4.1",
-    "gpt-4.1-mini",
+    "gpt-5",
 )
 
 ANTHROPIC_MODELS = (
@@ -123,31 +121,59 @@ def _auto_select(question: str, settings: Settings) -> ModelSelection:
     lowered = question.lower()
     signals: list[str] = []
 
-    document_terms = ("document", "file", "uploaded", "policy", "contract", "pdf", "refund")
+    document_terms = (
+        "document",
+        "documents",
+        "file",
+        "files",
+        "uploaded",
+        "policy",
+        "contract",
+        "pdf",
+        "refund",
+        "case",
+        "cases",
+        "caso",
+        "casos",
+        "documento",
+        "archivo",
+    )
     current_terms = ("current", "today", "latest", "news", "now", "weather", "price")
     reasoning_terms = ("why", "how", "compare", "analyze", "explain", "tradeoff", "plan")
 
-    if any(term in lowered for term in document_terms):
+    document_grounded = any(term in lowered for term in document_terms)
+    if document_grounded:
         signals.append("document-grounded wording")
     if any(term in lowered for term in current_terms):
         signals.append("current or external information wording")
     if any(term in lowered for term in reasoning_terms):
         signals.append("reasoning or explanation wording")
 
-    if any(term in lowered for term in reasoning_terms) and settings.anthropic_api_key:
+    # Prefer Claude for document/reasoning work when available — stronger multi-retrieve
+    # behavior on survey questions. Keep OpenAI as default for lighter asks.
+    wants_anthropic = document_grounded or any(term in lowered for term in reasoning_terms)
+    if wants_anthropic and settings.anthropic_api_key:
         provider = "anthropic"
         default_model = settings.anthropic_chat_model
-        reason = "Anthropic was selected for a reasoning-heavy question."
+        reason = (
+            "Anthropic was selected for a document-grounded or reasoning-heavy question."
+            if document_grounded
+            else "Anthropic was selected for a reasoning-heavy question."
+        )
+    elif wants_anthropic and not settings.anthropic_api_key and settings.openai_api_key:
+        provider = "openai"
+        default_model = settings.chat_model
+        reason = "OpenAI was selected because the Anthropic key is not configured."
     else:
         provider = "openai"
         default_model = settings.chat_model
-        reason = "OpenAI was selected as the default agent model for retrieval and tool use."
+        reason = "OpenAI was selected as the default agent model for this question."
 
     if provider == "openai" and not settings.openai_api_key and settings.anthropic_api_key:
         provider = "anthropic"
         default_model = settings.anthropic_chat_model
         reason = "Anthropic was selected because the OpenAI chat key is not configured."
-    elif provider == "anthropic" and not settings.anthropic_api_key:
+    elif provider == "anthropic" and not settings.anthropic_api_key and settings.openai_api_key:
         provider = "openai"
         default_model = settings.chat_model
         reason = "OpenAI was selected because the Anthropic key is not configured."
