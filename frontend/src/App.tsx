@@ -38,6 +38,7 @@ import {
   CHAT_SESSIONS,
   CONVERSATION_MEMORY,
   COST_GUARDRAIL,
+  coverageNotice,
   DOC_SIZE_WARNING,
   DOC_SIZE_WARNING_TITLE,
   explainAnswer,
@@ -688,9 +689,16 @@ export default function App() {
             ) : (
               turns.map((turn, index) => {
                 const walkthrough = explainAnswer(turn.response);
+                const coverage = coverageNotice(turn.response);
                 return (
                   <article key={`${turn.question}-${index}`} className="turn">
                     <p className="question">{turn.question}</p>
+                    {coverage ? (
+                      <aside className="callout warning turn-coverage" role="status">
+                        <strong>{coverage.title}</strong>
+                        <p>{coverage.body}</p>
+                      </aside>
+                    ) : null}
                     <div className="turn-meta-row">
                       <AgentPath
                         route={turn.response.route}
