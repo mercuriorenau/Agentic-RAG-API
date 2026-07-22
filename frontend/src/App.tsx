@@ -33,6 +33,7 @@ import { ProductTour, TourMode } from "./components/ProductTour";
 import { RetrievalTrace } from "./components/RetrievalTrace";
 import { TourLauncher } from "./components/TourLauncher";
 import {
+  CHAT_HISTORY,
   CHAT_SESSIONS,
   CONVERSATION_MEMORY,
   COST_GUARDRAIL,
@@ -43,7 +44,11 @@ import {
   MODEL_PICKER,
   RETRIEVAL_BUDGET,
 } from "./explainers";
-import { clearTourComplete, hasCompletedTour, markTourComplete } from "./tour/tourStorage";
+import {
+  clearTourComplete,
+  hasCompletedTour,
+  markTourComplete,
+} from "./tour/tourStorage";
 
 type ChatTurn = {
   question: string;
@@ -73,6 +78,10 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [userKey, setUserKey] = useState(getUserKey());
   const [tourMode, setTourMode] = useState<TourMode | null>(null);
+  const [chatsFlipped, setChatsFlipped] = useState(false);
+
+  const activeChat = chats.find((chat) => chat.id === activeChatId) ?? null;
+  const showCreateChatControl = chats.length === 0;
 
   async function refreshChats(preferredId?: string | null) {
     const items = await listChats();
@@ -178,6 +187,7 @@ export default function App() {
     setDocuments([]);
     setTurns([]);
     setError(null);
+    setChatsFlipped(false);
   }
 
   async function handleNewChat() {
@@ -189,11 +199,17 @@ export default function App() {
       setDocuments([]);
       setTurns([]);
       setQuestion("");
+      setChatsFlipped(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create chat");
     } finally {
       setBusy(false);
     }
+  }
+
+  function handleSelectChat(chatId: string) {
+    setActiveChatId(chatId);
+    setChatsFlipped(false);
   }
 
   async function handleDeleteChat(chatId: string) {
@@ -205,10 +221,11 @@ export default function App() {
       if (nextId) {
         await loadChat(nextId);
       } else {
-        const created = await createChat();
-        await refreshChats(created.id);
+        setActiveChatId(null);
         setDocuments([]);
         setTurns([]);
+        setQuestion("");
+        setChatsFlipped(false);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not delete chat");
@@ -295,14 +312,17 @@ export default function App() {
     }
   }
 
-  function handleTourClose() {
+  function finishFirstVisitFlow() {
     markTourComplete(userKey);
     setTourMode(null);
   }
 
+  function handleTourClose() {
+    finishFirstVisitFlow();
+  }
+
   function handleTourComplete() {
-    markTourComplete(userKey);
-    setTourMode(null);
+    finishFirstVisitFlow();
   }
 
   function handleAcceptInvite() {
@@ -310,8 +330,7 @@ export default function App() {
   }
 
   function handleDeclineInvite() {
-    markTourComplete(userKey);
-    setTourMode(null);
+    finishFirstVisitFlow();
   }
 
   function handleStartTour() {
@@ -320,6 +339,7 @@ export default function App() {
 
   function handleSimulateFirstVisit() {
     clearTourComplete(userKey);
+    setChatsFlipped(false);
     setTourMode("invite");
   }
 
@@ -361,66 +381,188 @@ export default function App() {
 
       <div className="workspace-grid">
         <div className="chats-column">
-        <aside className="panel chats-panel">
-          <div className="panel-head">
-            <div className="panel-title">
-              <h2>Chats</h2>
-              <Explainer summary="Why separate chats" tourAnchor>
-                {CHAT_SESSIONS}
-              </Explainer>
-            </div>
-            <button
-              type="button"
-              className="ghost"
-              data-tour="new-chat"
-              disabled={busy}
-              onClick={handleNewChat}
-            >
-              New
-            </button>
-          </div>
-          {chats.length === 0 ? (
-            <p className="muted">Create a chat to upload documents and ask questions.</p>
-          ) : (
-            <ul className="chat-list">
-              {chats.map((chat) => {
-                const isActive = chat.id === activeChatId;
-                return (
-                  <li key={chat.id} className={isActive ? "active chat-block" : "chat-block"}>
-                    <div className="chat-row">
+          <div className={`chats-flip${chatsFlipped ? " is-flipped" : ""}`}>
+            <div className="chats-flip-inner">
+              <aside className="panel chats-panel chats-face chats-face-front">
+                <div className="panel-head">
+                  <div className="panel-title">
+                    <h2>Chats</h2>
+                    <Explainer summary="Why separate chats" tourAnchor>
+                      {CHAT_SESSIONS}
+                    </Explainer>
+                  </div>
+                  {showCreateChatControl ? (
+                    <div className="create-chat-control">
                       <button
                         type="button"
-                        className="chat-select"
-                        data-tour={isActive ? "chat-select" : undefined}
+                        className="ghost create-chat-btn"
+                        data-tour="new-chat"
                         disabled={busy}
-                        onClick={() => setActiveChatId(chat.id)}
+                        onClick={handleNewChat}
                       >
-                        {chat.title}
+                        <span className="create-chat-icon" aria-hidden="true">
+                          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                            <path d="M12 5v14M5 12h14" />
+                          </svg>
+                        </span>
+                        Create new chat
                       </button>
+                    </div>
+                  ) : (
+                    <div className="create-chat-control">
+                      <button
+                        type="button"
+                        className="flip-chat-btn"
+                        data-tour="chat-history"
+                        disabled={busy}
+                        aria-label="Flip to all chats"
+                        title="Flip to all chats"
+                        onClick={() => setChatsFlipped(true)}
+                      >
+                        <span className="u-turn-icon" aria-hidden="true">
+                          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M9 14 4 9l5-5" />
+                            <path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" />
+                          </svg>
+                        </span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+                {!activeChat ? (
+                  <div className="chat-empty-prompt">
+                    <p className="muted">
+                      No active chat. Create one here to upload documents and ask — no need to flip the card.
+                    </p>
+                    <button
+                      type="button"
+                      className="ghost create-chat-btn"
+                      disabled={busy}
+                      onClick={handleNewChat}
+                    >
+                      <span className="create-chat-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                          <path d="M12 5v14M5 12h14" />
+                        </svg>
+                      </span>
+                      Create new chat
+                    </button>
+                  </div>
+                ) : (
+                  <div className="chat-block active front-chat">
+                    <div className="chat-row">
+                      <p className="chat-select front-chat-title" title={activeChat.title}>
+                        {activeChat.title}
+                      </p>
                       <button
                         type="button"
                         className="linkish danger"
-                        data-tour={isActive ? "delete-chat" : undefined}
+                        data-tour="delete-chat"
                         disabled={busy}
-                        onClick={() => handleDeleteChat(chat.id)}
+                        onClick={() => handleDeleteChat(activeChat.id)}
                       >
                         Delete
                       </button>
                     </div>
-                    {isActive ? (
-                      <DocumentPanel
-                        documents={documents}
-                        busy={busy || !activeChatId}
-                        onUpload={handleUpload}
-                        onDelete={handleDelete}
-                      />
-                    ) : null}
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </aside>
+                    <DocumentPanel
+                      documents={documents}
+                      busy={busy || !activeChatId}
+                      onUpload={handleUpload}
+                      onDelete={handleDelete}
+                    />
+                  </div>
+                )}
+              </aside>
+
+              <aside className="panel chats-panel chats-face chats-face-back" aria-hidden={!chatsFlipped}>
+                <div className="panel-head">
+                  <div className="panel-title">
+                    <h2>All chats</h2>
+                    <Explainer summary="Chat history">{CHAT_HISTORY}</Explainer>
+                  </div>
+                  <div className="chats-back-actions">
+                    <button
+                      type="button"
+                      className="ghost create-chat-btn"
+                      data-tour="new-chat-back"
+                      disabled={busy}
+                      onClick={handleNewChat}
+                    >
+                      <span className="create-chat-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                          <path d="M12 5v14M5 12h14" />
+                        </svg>
+                      </span>
+                      New chat
+                    </button>
+                    <button
+                      type="button"
+                      className="flip-chat-btn"
+                      disabled={busy}
+                      aria-label="Flip back to active chat"
+                      title="Flip back"
+                      onClick={() => setChatsFlipped(false)}
+                    >
+                      <span className="u-turn-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M9 14 4 9l5-5" />
+                          <path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" />
+                        </svg>
+                      </span>
+                    </button>
+                  </div>
+                </div>
+                {chats.length === 0 ? (
+                  <div className="chat-empty-prompt">
+                    <p className="muted">No chats yet. Create one to upload documents and ask.</p>
+                    <button
+                      type="button"
+                      className="ghost create-chat-btn"
+                      data-tour="new-chat"
+                      disabled={busy}
+                      onClick={handleNewChat}
+                    >
+                      <span className="create-chat-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                          <path d="M12 5v14M5 12h14" />
+                        </svg>
+                      </span>
+                      Create new chat
+                    </button>
+                  </div>
+                ) : (
+                  <ul className="chat-list chat-list-back">
+                    {chats.map((chat) => {
+                      const isActive = chat.id === activeChatId;
+                      return (
+                        <li key={chat.id} className={isActive ? "active chat-block" : "chat-block"}>
+                          <div className="chat-row">
+                            <button
+                              type="button"
+                              className="chat-select"
+                              data-tour={isActive ? "chat-select" : undefined}
+                              disabled={busy}
+                              onClick={() => handleSelectChat(chat.id)}
+                            >
+                              {chat.title}
+                            </button>
+                            <button
+                              type="button"
+                              className="linkish danger"
+                              disabled={busy}
+                              onClick={() => handleDeleteChat(chat.id)}
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </aside>
+            </div>
+          </div>
           <aside className="callout warning" role="status">
             <strong>{DOC_SIZE_WARNING_TITLE}</strong>
             <p>{DOC_SIZE_WARNING}</p>
