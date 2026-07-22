@@ -519,6 +519,74 @@ textarea {
   align-items: center;
 }
 
+.create-chat-nudge {
+  position: absolute;
+  top: calc(100% + 0.55rem);
+  right: 0;
+  z-index: 5;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.35rem;
+  min-width: 11.5rem;
+  max-width: 14rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--accent) 16%, var(--panel));
+  color: var(--ink);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent),
+    var(--shadow-soft);
+  animation: create-nudge-in 280ms ease both;
+}
+
+.create-chat-nudge p {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.create-chat-nudge-arrow {
+  position: absolute;
+  top: -6px;
+  right: 1.1rem;
+  width: 10px;
+  height: 10px;
+  background: color-mix(in srgb, var(--accent) 16%, var(--panel));
+  border-left: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  border-top: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  transform: rotate(45deg);
+}
+
+.create-chat-nudge-dismiss {
+  flex-shrink: 0;
+  margin: -0.15rem -0.2rem 0 0;
+  padding: 0 0.25rem;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  box-shadow: none;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+@keyframes create-nudge-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .create-chat-nudge {
+    animation: none;
+  }
+}
 
 .create-chat-icon,
 .u-turn-icon {
