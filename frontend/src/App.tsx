@@ -25,6 +25,7 @@ import {
   uploadDocument,
 } from "./api";
 import { AgentPath } from "./components/AgentPath";
+import { ASK_BUSY_PHASES, BusyStatus } from "./components/BusyStatus";
 import { Citations } from "./components/Citations";
 import { AnswerExplainerBlock, Explainer } from "./components/Explainer";
 import { DocumentPanel } from "./components/DocumentPanel";
@@ -80,6 +81,7 @@ export default function App() {
   const [selectedModelId, setSelectedModelId] = useState("auto");
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const [busy, setBusy] = useState(false);
+  const [busyKind, setBusyKind] = useState<"ask" | "upload" | "auth" | "other" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [userKey, setUserKey] = useState(getUserKey());
   const [tourMode, setTourMode] = useState<TourMode | null>(null);
@@ -166,9 +168,19 @@ export default function App() {
     loadChat(activeChatId).catch((err: Error) => setError(err.message));
   }, [authed, activeChatId]);
 
+  function beginBusy(kind: "ask" | "upload" | "auth" | "other") {
+    setBusy(true);
+    setBusyKind(kind);
+  }
+
+  function endBusy() {
+    setBusy(false);
+    setBusyKind(null);
+  }
+
   async function handleAuth(mode: "login" | "register", email: string, password: string) {
     setError(null);
-    setBusy(true);
+    beginBusy("auth");
     try {
       if (mode === "register") {
         await register(email, password);
@@ -179,7 +191,7 @@ export default function App() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Authentication failed");
     } finally {
-      setBusy(false);
+      endBusy();
     }
   }
 
@@ -199,7 +211,7 @@ export default function App() {
 
   async function handleNewChat() {
     setError(null);
-    setBusy(true);
+    beginBusy("other");
     try {
       const chat = await createChat();
       await refreshChats(chat.id);
@@ -213,7 +225,7 @@ export default function App() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create chat");
     } finally {
-      setBusy(false);
+      endBusy();
     }
   }
 
@@ -224,7 +236,7 @@ export default function App() {
 
   async function handleDeleteChat(chatId: string) {
     setError(null);
-    setBusy(true);
+    beginBusy("other");
     try {
       await deleteChat(chatId);
       const nextId = await refreshChats(null);
@@ -240,7 +252,7 @@ export default function App() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not delete chat");
     } finally {
-      setBusy(false);
+      endBusy();
     }
   }
 
@@ -249,14 +261,14 @@ export default function App() {
       return;
     }
     setError(null);
-    setBusy(true);
+    beginBusy("upload");
     try {
       await uploadDocument(activeChatId, file);
       setDocuments(await listDocuments(activeChatId));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
     } finally {
-      setBusy(false);
+      endBusy();
     }
   }
 
@@ -265,14 +277,14 @@ export default function App() {
       return;
     }
     setError(null);
-    setBusy(true);
+    beginBusy("other");
     try {
       await deleteDocument(id);
       setDocuments(await listDocuments(activeChatId));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Delete failed");
     } finally {
-      setBusy(false);
+      endBusy();
     }
   }
 
@@ -281,14 +293,14 @@ export default function App() {
       return;
     }
     setError(null);
-    setBusy(true);
+    beginBusy("other");
     try {
       await clearChatMessages(activeChatId);
       setTurns([]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not clear chat memory");
     } finally {
-      setBusy(false);
+      endBusy();
     }
   }
 
@@ -301,7 +313,7 @@ export default function App() {
     const selected =
       modelOptions.find((option) => option.id === selectedModelId) || FALLBACK_MODELS[0];
     setError(null);
-    setBusy(true);
+    beginBusy("ask");
     try {
       const history = historyFromTurns(turns);
       const response = await askQuestion(
@@ -318,7 +330,7 @@ export default function App() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Query failed");
     } finally {
-      setBusy(false);
+      endBusy();
     }
   }
 
@@ -522,6 +534,7 @@ export default function App() {
                     <DocumentPanel
                       documents={documents}
                       busy={busy || !activeChatId}
+                      uploading={busyKind === "upload"}
                       onUpload={handleUpload}
                       onDelete={handleDelete}
                     />
@@ -674,11 +687,24 @@ export default function App() {
             <button
               type="submit"
               data-tour="ask-button"
+              className={busyKind === "ask" ? "ask-submit is-busy" : "ask-submit"}
               disabled={busy || !question.trim() || !activeChatId}
             >
-              {busy ? "Working…" : "Ask"}
+              {busyKind === "ask" ? (
+                <>
+                  <span className="busy-spinner busy-spinner-inline" aria-hidden="true" />
+                  Thinking…
+                </>
+              ) : (
+                "Ask"
+              )}
             </button>
           </form>
+          <BusyStatus
+            active={busyKind === "ask"}
+            label="Working on your question"
+            phases={ASK_BUSY_PHASES}
+          />
 
           <div className="turns" data-tour="turns">
             {turns.length === 0 ? (
