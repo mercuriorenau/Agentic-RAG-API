@@ -57,17 +57,34 @@ export const CITATIONS =
   "known) or a web snippet. The score reflects retrieval ranking after hybrid search " +
   "and optional rerank (higher is stronger). Retrieval attempts may show adaptive top_k.";
 
+export const AGENT_PATH =
+  "Route is the path the agent took: retrieve (uploaded files), web, direct, or mixed. " +
+  "The model badge is which LLM ran the agent loop (Auto or your lock). " +
+  "Tool chips count each tool call in that loop — retrieve_documents ×9 means nine " +
+  "separate searches, not nine models. The agent may search again with a new query " +
+  "when coverage looks thin.";
+
 export type AnswerExplainer = {
   title: string;
   paragraphs: string[];
 };
 
+function summarizeToolCalls(tools: string[]): string {
+  if (tools.length === 0) {
+    return "none (model answered without a tool call)";
+  }
+  const counts = new Map<string, number>();
+  for (const tool of tools) {
+    counts.set(tool, (counts.get(tool) || 0) + 1);
+  }
+  return [...counts.entries()]
+    .map(([name, count]) => (count > 1 ? `${name} ×${count}` : name))
+    .join(", ");
+}
+
 export function explainAnswer(response: QueryResponse): AnswerExplainer {
   const paragraphs: string[] = [];
-  const tools = response.tools_used.length
-    ? response.tools_used.join(", ")
-    : "none (model answered without a tool call)";
-
+  const tools = summarizeToolCalls(response.tools_used);
   paragraphs.push(routeParagraph(response.route));
   paragraphs.push(`Tools used this turn: ${tools}.`);
 

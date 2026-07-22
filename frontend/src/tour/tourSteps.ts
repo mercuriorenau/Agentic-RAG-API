@@ -50,7 +50,8 @@ export const TOUR_STEPS: TourStep[] = [
     id: "answers",
     title: "Traceable answers",
     body:
-      "Each reply shows route, model, citations, and retrieval attempts (including adaptive top_k) so you can verify what the agent used.",
+      `Each reply shows route, model, tool-call counts, citations, and a search log ` +
+      `(Self-RAG grades, top_k, candidates, rerank) so you can verify what the agent used.`,
     target: '[data-tour="turns"]',
   },
 ];

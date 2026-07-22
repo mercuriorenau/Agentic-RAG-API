@@ -24,14 +24,15 @@ import {
   turnsFromMessages,
   uploadDocument,
 } from "./api";
-import { AuthForm } from "./components/AuthForm";
-import { StackStrip } from "./components/StackStrip";
+import { AgentPath } from "./components/AgentPath";
 import { Citations } from "./components/Citations";
-import { DocumentPanel } from "./components/DocumentPanel";
 import { AnswerExplainerBlock, Explainer } from "./components/Explainer";
+import { DocumentPanel } from "./components/DocumentPanel";
 import { ProductTour, TourMode } from "./components/ProductTour";
 import { RetrievalTrace } from "./components/RetrievalTrace";
 import { TourLauncher } from "./components/TourLauncher";
+import { StackStrip } from "./components/StackStrip";
+import { AuthForm } from "./components/AuthForm";
 import {
   CHAT_HISTORY,
   CHAT_SESSIONS,
@@ -691,17 +692,12 @@ export default function App() {
                   <article key={`${turn.question}-${index}`} className="turn">
                     <p className="question">{turn.question}</p>
                     <div className="turn-meta-row">
-                      <div className="meta">
-                        <span className="badge">{turn.response.route}</span>
-                        <span className="badge">
-                          {turn.response.model_provider}: {turn.response.model_name}
-                        </span>
-                        {turn.response.tools_used.map((tool) => (
-                          <span key={tool} className="badge subtle">
-                            {tool}
-                          </span>
-                        ))}
-                      </div>
+                      <AgentPath
+                        route={turn.response.route}
+                        modelProvider={turn.response.model_provider}
+                        modelName={turn.response.model_name}
+                        toolsUsed={turn.response.tools_used}
+                      />
                       <AnswerExplainerBlock
                         title={walkthrough.title}
                         paragraphs={walkthrough.paragraphs}
