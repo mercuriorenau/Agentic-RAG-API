@@ -9,7 +9,8 @@ export const TOUR_INVITE = {
   title: "Want a quick walkthrough?",
   body:
     "This project is an agentic RAG demo: each chat owns its documents, and an agent decides when to retrieve from your files, search the web, or answer directly. " +
-    "I can show you the flow in about a minute — useful if you want the product story and a bit of the architecture.",
+    "Retrieval is intentionally capped for demo token cost — prefer short PDFs or section-by-section questions. " +
+    "I can show you the flow in about a minute.",
   acceptLabel: "Take the guide",
   declineLabel: "Skip for now",
 };
@@ -27,28 +28,28 @@ export const TOUR_STEPS: TourStep[] = [
     id: "documents",
     title: "Upload & index",
     body:
-      "Files are extracted, chunked, embedded, and stored in Postgres with pgvector. Later questions search those vectors — not the whole file again.",
+      "Files are chunked, embedded, and stored in Postgres/pgvector. Later questions search those vectors — not the whole file. Prefer ~15 pages or less for this demo’s retrieval budget.",
     target: '[data-tour="upload-doc"]',
   },
   {
     id: "ask",
     title: "Ask the agent",
     body:
-      "The agent picks a tool path: retrieve_documents, web_search, or answer_directly. Auto can also choose a model before that loop runs.",
+      "The agent picks retrieve_documents, web_search, or answer_directly. Retrieve uses adaptive top_k (max 8) so long-document surveys stay token-safe.",
     target: '[data-tour="ask-button"]',
   },
   {
     id: "tech-notes",
     title: "Dashed info icons",
     body:
-      "Tap a dashed i next to a section title for a short technical note — chats, uploads, models, memory, citations, and more. They stay tucked away until you want the detail.",
+      "Tap a dashed i for technical notes — chats, uploads, models, memory, citations, and the retrieval budget. They stay tucked away until you want the detail.",
     target: '[data-tour="tech-note"]',
   },
   {
     id: "answers",
     title: "Traceable answers",
     body:
-      "Each reply shows route, model, and citations so you can verify what the agent used.",
+      "Each reply shows route, model, citations, and retrieval attempts (including adaptive top_k) so you can verify what the agent used.",
     target: '[data-tour="turns"]',
   },
 ];

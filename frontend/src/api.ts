@@ -55,7 +55,12 @@ export type QueryResponse = {
   model_provider: string;
   model_name: string;
   model_selection_explanation: string;
-  retrieval_trace?: { query: string; grade: string; chunk_count: number }[] | null;
+  retrieval_trace?: {
+    query: string;
+    grade: string;
+    chunk_count: number;
+    top_k?: number;
+  }[] | null;
 };
 
 const TOKEN_KEY = "rag_access_token";
