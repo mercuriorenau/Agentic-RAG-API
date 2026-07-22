@@ -505,15 +505,17 @@ export default function App() {
                       <p className="chat-select front-chat-title" title={activeChat.title}>
                         {activeChat.title}
                       </p>
-                      <button
-                        type="button"
-                        className="linkish danger"
-                        data-tour="delete-chat"
-                        disabled={busy}
-                        onClick={() => handleDeleteChat(activeChat.id)}
-                      >
-                        Delete
-                      </button>
+                      {chats.length > 1 ? (
+                        <button
+                          type="button"
+                          className="linkish danger"
+                          data-tour="delete-chat"
+                          disabled={busy}
+                          onClick={() => handleDeleteChat(activeChat.id)}
+                        >
+                          Delete
+                        </button>
+                      ) : null}
                     </div>
                     <DocumentPanel
                       documents={documents}
@@ -597,14 +599,16 @@ export default function App() {
                             >
                               {chat.title}
                             </button>
-                            <button
-                              type="button"
-                              className="linkish danger"
-                              disabled={busy}
-                              onClick={() => handleDeleteChat(chat.id)}
-                            >
-                              Delete
-                            </button>
+                            {chats.length > 1 ? (
+                              <button
+                                type="button"
+                                className="linkish danger"
+                                disabled={busy}
+                                onClick={() => handleDeleteChat(chat.id)}
+                              >
+                                Delete
+                              </button>
+                            ) : null}
                           </div>
                         </li>
                       );
