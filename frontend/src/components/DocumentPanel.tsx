@@ -2,11 +2,13 @@ import { ChangeEvent, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { DocumentItem, fetchDocumentBlob } from "../api";
 import { DOC_UPLOAD } from "../explainers";
+import { BusyStatus, UPLOAD_BUSY_PHASES } from "./BusyStatus";
 import { Explainer } from "./Explainer";
 
 type Props = {
   documents: DocumentItem[];
   busy: boolean;
+  uploading?: boolean;
   onUpload: (file: File) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
 };
@@ -18,7 +20,7 @@ type PreviewState = {
   text?: string;
 };
 
-export function DocumentPanel({ documents, busy, onUpload, onDelete }: Props) {
+export function DocumentPanel({ documents, busy, uploading = false, onUpload, onDelete }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<PreviewState | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
@@ -114,7 +116,7 @@ export function DocumentPanel({ documents, busy, onUpload, onDelete }: Props) {
           disabled={busy}
           onClick={() => inputRef.current?.click()}
         >
-          Upload
+          {uploading ? "Indexing…" : "Upload"}
         </button>
         <input
           ref={inputRef}
@@ -124,6 +126,11 @@ export function DocumentPanel({ documents, busy, onUpload, onDelete }: Props) {
           onChange={handleChange}
         />
       </div>
+      <BusyStatus
+        active={uploading}
+        label="Indexing document"
+        phases={UPLOAD_BUSY_PHASES}
+      />
       {previewError ? <p className="form-error">{previewError}</p> : null}
       {documents.length === 0 ? (
         <p className="muted compact-muted">No files in this chat yet.</p>
