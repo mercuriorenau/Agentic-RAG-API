@@ -25,6 +25,7 @@ import {
   uploadDocument,
 } from "./api";
 import { AuthForm } from "./components/AuthForm";
+import { StackStrip } from "./components/StackStrip";
 import { Citations } from "./components/Citations";
 import { DocumentPanel } from "./components/DocumentPanel";
 import { AnswerExplainerBlock, Explainer } from "./components/Explainer";
@@ -339,6 +340,7 @@ export default function App() {
           </header>
           <AuthForm busy={busy} error={error} onSubmit={handleAuth} />
         </div>
+        <StackStrip />
       </div>
     );
   }
