@@ -10,6 +10,8 @@ from app.services.rag_service import RAGService, RetrievedChunk, reciprocal_rank
 def _settings(**overrides):
     base = {
         "top_k": 5,
+        "top_k_max": 8,
+        "adaptive_top_k": True,
         "candidate_multiplier": 4,
         "retrieval_min_score": 0.2,
         "rerank_enabled": False,

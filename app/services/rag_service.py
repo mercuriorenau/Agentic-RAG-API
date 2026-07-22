@@ -8,6 +8,7 @@ from app.core.config import Settings, get_settings
 from app.models import Chunk, Document, User
 from app.services.embedding_service import EmbeddingService
 from app.services.rerank_service import LLMReranker
+from app.services.retrieval_budget import resolve_top_k
 from app.services.self_rag import SelfRAGHelper, needs_retry
 
 
@@ -23,12 +24,14 @@ class RetrievalAttempt:
     query: str
     grade: str
     chunk_count: int
+    top_k: int = 0
 
 
 @dataclass
 class RetrievalTrace:
     attempts: list[RetrievalAttempt] = field(default_factory=list)
     final_query: str = ""
+    top_k: int = 0
 
     def to_dicts(self) -> list[dict]:
         return [
@@ -36,6 +39,7 @@ class RetrievalTrace:
                 "query": item.query,
                 "grade": item.grade,
                 "chunk_count": item.chunk_count,
+                "top_k": item.top_k,
             }
             for item in self.attempts
         ]
@@ -87,13 +91,17 @@ class RAGService:
         trace = RetrievalTrace(final_query=question)
         query = question.strip()
         best_chunks: list[RetrievedChunk] = []
+        top_k = resolve_top_k(query, self.settings)
+        trace.top_k = top_k
 
         max_attempts = 1 + (
             self.settings.self_rag_max_retries if self.settings.self_rag_enabled else 0
         )
 
         for attempt_index in range(max_attempts):
-            chunks = await self._retrieve_once(user, query, chat_id=chat_id)
+            chunks = await self._retrieve_once(
+                user, query, chat_id=chat_id, top_k=top_k
+            )
             passages = [item.chunk.content for item in chunks]
             if self.settings.self_rag_enabled:
                 grade = await self.self_rag.grade_evidence(query, passages)
@@ -101,7 +109,12 @@ class RAGService:
                 grade = "sufficient" if chunks else "irrelevant"
 
             trace.attempts.append(
-                RetrievalAttempt(query=query, grade=grade, chunk_count=len(chunks))
+                RetrievalAttempt(
+                    query=query,
+                    grade=grade,
+                    chunk_count=len(chunks),
+                    top_k=top_k,
+                )
             )
             trace.final_query = query
 
@@ -127,9 +140,12 @@ class RAGService:
         question: str,
         *,
         chat_id: uuid.UUID | None = None,
+        top_k: int,
     ) -> list[RetrievedChunk]:
         query_embedding = await self.embedding_service.embed_query(question)
-        return await self._retrieve_chunks(user, question, query_embedding, chat_id=chat_id)
+        return await self._retrieve_chunks(
+            user, question, query_embedding, chat_id=chat_id, top_k=top_k
+        )
 
     async def _retrieve_chunks(
         self,
@@ -138,10 +154,11 @@ class RAGService:
         query_embedding: list[float],
         *,
         chat_id: uuid.UUID | None = None,
+        top_k: int,
     ) -> list[RetrievedChunk]:
         candidate_limit = max(
-            self.settings.top_k * self.settings.candidate_multiplier,
-            self.settings.top_k,
+            top_k * self.settings.candidate_multiplier,
+            top_k,
         )
 
         dense_rows = await self._dense_retrieve(
@@ -186,7 +203,7 @@ class RAGService:
         if not filtered:
             return []
 
-        return await self._rerank(question, filtered)
+        return await self._rerank(question, filtered, top_k=top_k)
 
     async def _dense_retrieve(
         self,
@@ -255,15 +272,17 @@ class RAGService:
         self,
         question: str,
         candidates: list[RetrievedChunk],
+        *,
+        top_k: int,
     ) -> list[RetrievedChunk]:
         if not self.settings.rerank_enabled:
-            return candidates[: self.settings.top_k]
+            return candidates[:top_k]
 
         order = await self.reranker.rank_indices(
             question,
             [item.chunk.content for item in candidates],
         )
         if order is None:
-            return candidates[: self.settings.top_k]
+            return candidates[:top_k]
         reranked = [candidates[i] for i in order if 0 <= i < len(candidates)]
-        return reranked[: self.settings.top_k]
+        return reranked[:top_k]
