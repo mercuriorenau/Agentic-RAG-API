@@ -64,6 +64,14 @@ export const AGENT_PATH =
   "separate searches, not nine models. The agent may search again with a new query " +
   "when coverage looks thin.";
 
+export const RETRIEVAL_ATTEMPTS =
+  "This log is the search pipeline inside retrieve_documents. Hybrid search (vector + " +
+  "full-text, fused with RRF) builds candidates; an optional LLM reranker reorders them; " +
+  "then only top_k passages go to the agent. Self-RAG grades evidence as sufficient, " +
+  "partial, or irrelevant — if weak, it rewrites the query and searches again. " +
+  "top_k is the adaptive budget for this question (capped for the demo). " +
+  "Candidates are how many passages passed the score floor before the final cut.";
+
 export type AnswerExplainer = {
   title: string;
   paragraphs: string[];
@@ -109,18 +117,91 @@ export function explainAnswer(response: QueryResponse): AnswerExplainer {
   }
 
   if (response.retrieval_trace && response.retrieval_trace.length > 0) {
-    const last = response.retrieval_trace[response.retrieval_trace.length - 1];
-    paragraphs.push(
-      `Retrieval budget this turn: ${last.chunk_count} chunk(s)` +
-        (last.top_k ? ` with adaptive top_k=${last.top_k}` : "") +
-        ". Broad questions may miss sections on purpose — ask one case/section for more.",
-    );
+    paragraphs.push(...retrievalWalkthrough(response.retrieval_trace));
   }
 
   return {
     title: "What just happened",
     paragraphs,
   };
+}
+
+function retrievalWalkthrough(
+  attempts: NonNullable<QueryResponse["retrieval_trace"]>,
+): string[] {
+  const last = attempts[attempts.length - 1];
+  const lines: string[] = [];
+  const topK = last.top_k;
+  const base = last.top_k_base;
+  const maxK = last.top_k_max;
+  const candidates = last.candidate_count;
+  const pool = last.candidate_pool_limit;
+  const finalChunks = last.chunk_count;
+
+  let budget =
+    `Retrieval budget: kept ${finalChunks} final chunk(s)` +
+    (topK ? ` with adaptive top_k=${topK}` : "") +
+    (base && maxK ? ` (base TOP_K=${base}, hard cap TOP_K_MAX=${maxK})` : "") +
+    ".";
+  if (typeof candidates === "number") {
+    budget +=
+      ` Hybrid search scored ${candidates} candidate passage(s)` +
+      (pool ? ` from pools of up to ${pool} per channel (dense + full-text, fused with RRF)` : "") +
+      " before the final cut.";
+  }
+  lines.push(budget);
+
+  switch (last.rerank) {
+    case "applied":
+      lines.push(
+        "Rerank: an LLM listwise reranker reordered those candidates by relevance to the question, then the pipeline sliced to top_k.",
+      );
+      break;
+    case "disabled":
+      lines.push(
+        "Rerank: disabled for this deploy — the pipeline kept hybrid RRF order and sliced to top_k.",
+      );
+      break;
+    case "fail_open":
+      lines.push(
+        "Rerank: enabled, but the reranker failed open — hybrid order was kept, then sliced to top_k so retrieve still returned passages.",
+      );
+      break;
+    case "skipped":
+      lines.push(
+        "Rerank: skipped (no candidates passed the score floor), so nothing was reordered.",
+      );
+      break;
+    default:
+      if (last.rerank) {
+        lines.push(`Rerank status: ${last.rerank}.`);
+      }
+  }
+
+  if (attempts.length > 1) {
+    const grades = attempts.map((item, index) => `pass ${index + 1}=${item.grade}`).join(", ");
+    lines.push(
+      `Search log: ${attempts.length} pass(es) across retrieve_documents call(s) (${grades}). ` +
+        "Later passes may use a rewritten query when Self-RAG graded evidence as thin.",
+    );
+  } else if (last.grade) {
+    lines.push(`Self-RAG evidence grade for this retrieve: ${last.grade}.`);
+  }
+
+  if (
+    last.budget_capped &&
+    typeof last.ideal_top_k === "number" &&
+    typeof topK === "number" &&
+    last.ideal_top_k > topK
+  ) {
+    lines.push(
+      `Budget note: this question would be better with about top_k=${last.ideal_top_k} ` +
+        `passages because it needs wider coverage, but the demo hard-capped retrieve at ` +
+        `top_k=${topK}. Ask one case/section at a time for detail the cap may have missed.`,
+    );
+  }
+
+  return lines;
 }
 
 function routeParagraph(route: string): string {
