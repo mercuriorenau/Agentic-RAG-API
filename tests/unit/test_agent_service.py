@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from app.core.config import Settings
-from app.schemas.query import Citation, ConversationTurn
+from app.schemas.query import ConversationTurn
 from app.services.agent_service import AgentService, resolve_route
 from app.services.llm.base import ChatResult, ToolCall
 
