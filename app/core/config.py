@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 1440
     upload_dir: str = "./uploads"
     embedding_model: str = "text-embedding-3-small"
-    chat_model: str = "gpt-4o"
+    chat_model: str = "gpt-4.1"
     anthropic_chat_model: str = "claude-sonnet-4-5"
     chunk_size: int = 800
     chunk_overlap: int = 100
@@ -30,7 +30,7 @@ class Settings(BaseSettings):
     rerank_model: str = "gpt-4o-mini"
     self_rag_enabled: bool = True
     self_rag_max_retries: int = 2
-    agent_max_tool_rounds: int = 3
+    agent_max_tool_rounds: int = 5
     conversation_history_max_turns: int = 6
     rate_limit_auth: str = "10/minute"
     rate_limit_query: str = "3/day"
