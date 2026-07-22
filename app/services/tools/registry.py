@@ -218,7 +218,12 @@ async def _retrieve_documents(arguments: dict[str, Any], context: ToolContext) -
     budget_note += (
         "This demo intentionally does not load the entire document into the model. "
     )
-    if capped and ideal_k and used_k and ideal_k > used_k:
+    if (
+        capped
+        and isinstance(ideal_k, int)
+        and isinstance(used_k, int)
+        and ideal_k > used_k
+    ):
         budget_note += (
             f"This question would be better with about top_k={ideal_k} passages for fuller "
             f"coverage, but the demo capped retrieve at top_k={used_k}. "
