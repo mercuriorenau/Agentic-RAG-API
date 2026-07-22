@@ -45,8 +45,11 @@ import {
   RETRIEVAL_BUDGET,
 } from "./explainers";
 import {
+  clearCreateNudgeDone,
   clearTourComplete,
   hasCompletedTour,
+  hasDismissedCreateNudge,
+  markCreateNudgeDone,
   markTourComplete,
 } from "./tour/tourStorage";
 
@@ -79,6 +82,7 @@ export default function App() {
   const [userKey, setUserKey] = useState(getUserKey());
   const [tourMode, setTourMode] = useState<TourMode | null>(null);
   const [chatsFlipped, setChatsFlipped] = useState(false);
+  const [showCreateNudge, setShowCreateNudge] = useState(false);
 
   const activeChat = chats.find((chat) => chat.id === activeChatId) ?? null;
   const showCreateChatControl = chats.length === 0;
@@ -188,6 +192,7 @@ export default function App() {
     setTurns([]);
     setError(null);
     setChatsFlipped(false);
+    setShowCreateNudge(false);
   }
 
   async function handleNewChat() {
@@ -200,6 +205,9 @@ export default function App() {
       setTurns([]);
       setQuestion("");
       setChatsFlipped(false);
+      if (showCreateNudge) {
+        dismissCreateNudge();
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create chat");
     } finally {
@@ -315,6 +323,16 @@ export default function App() {
   function finishFirstVisitFlow() {
     markTourComplete(userKey);
     setTourMode(null);
+    // After the invite/tour — not during it — nudge first-time users to create a chat.
+    if (!hasDismissedCreateNudge(userKey)) {
+      setShowCreateNudge(true);
+      setChatsFlipped(false);
+    }
+  }
+
+  function dismissCreateNudge() {
+    markCreateNudgeDone(userKey);
+    setShowCreateNudge(false);
   }
 
   function handleTourClose() {
@@ -339,6 +357,8 @@ export default function App() {
 
   function handleSimulateFirstVisit() {
     clearTourComplete(userKey);
+    clearCreateNudgeDone(userKey);
+    setShowCreateNudge(false);
     setChatsFlipped(false);
     setTourMode("invite");
   }
@@ -407,6 +427,20 @@ export default function App() {
                         </span>
                         Create new chat
                       </button>
+                      {showCreateNudge && tourMode === null ? (
+                        <div className="create-chat-nudge" role="status">
+                          <span className="create-chat-nudge-arrow" aria-hidden="true" />
+                          <p>Click here to create a new chat</p>
+                          <button
+                            type="button"
+                            className="create-chat-nudge-dismiss"
+                            aria-label="Dismiss"
+                            onClick={dismissCreateNudge}
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ) : null}
                     </div>
                   ) : (
                     <div className="create-chat-control">
@@ -417,7 +451,10 @@ export default function App() {
                         disabled={busy}
                         aria-label="Flip to all chats"
                         title="Flip to all chats"
-                        onClick={() => setChatsFlipped(true)}
+                        onClick={() => {
+                        dismissCreateNudge();
+                        setChatsFlipped(true);
+                      }}
                       >
                         <span className="u-turn-icon" aria-hidden="true">
                           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -426,6 +463,20 @@ export default function App() {
                           </svg>
                         </span>
                       </button>
+                      {showCreateNudge && tourMode === null ? (
+                        <div className="create-chat-nudge" role="status">
+                          <span className="create-chat-nudge-arrow" aria-hidden="true" />
+                          <p>Click the arrow to flip and create a new chat</p>
+                          <button
+                            type="button"
+                            className="create-chat-nudge-dismiss"
+                            aria-label="Dismiss"
+                            onClick={dismissCreateNudge}
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ) : null}
                     </div>
                   )}
                 </div>
