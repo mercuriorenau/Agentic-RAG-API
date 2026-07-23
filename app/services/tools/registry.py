@@ -18,6 +18,11 @@ class ToolContext:
     chat_id: UUID | None = None
     tavily_api_key: str = ""
     user_question: str = ""
+    seen_retrieve_keys: set[str] = field(default_factory=set)
+    retrieve_call_count: int = 0
+
+
+_MAX_BROAD_RETRIEVES = 2
 
 
 @dataclass
@@ -35,6 +40,8 @@ TOOL_SPECS: list[ToolSpec] = [
             "Use this when the answer likely depends on uploaded files. "
             "Prefer search queries that match the document language and concrete labels "
             "(e.g. 'Caso 1', company names) over abstract English paraphrases. "
+            "For broad surveys, one well-formed retrieve is usually enough — avoid "
+            "repeating near-duplicate searches in the same turn. "
             "Retrieval returns a small adaptive budget of chunks (not the whole file) "
             "to limit tokens — for long documents, prefer focused queries "
             "(one case/section) over 'list everything'. "
@@ -115,10 +122,33 @@ async def _retrieve_documents(arguments: dict[str, Any], context: ToolContext) -
     budget_question = user_question or query
     # Broad surveys: search with the user's wording. Models often pass abstract English
     # tool queries ("case descriptions") that miss Spanish PDFs even when top_k is raised.
-    if user_question and query_looks_broad(budget_question):
+    broad = bool(user_question and query_looks_broad(budget_question))
+    if broad:
         search_query = user_question
     else:
         search_query = query
+
+    effective_key = search_query.casefold()
+    if effective_key in context.seen_retrieve_keys:
+        return ToolResult(
+            content=(
+                "Already retrieved for this effective query earlier in the turn. "
+                "Use the prior passages — do not call retrieve_documents again with a "
+                "similar survey or duplicate query."
+            )
+        )
+    if broad and context.retrieve_call_count >= _MAX_BROAD_RETRIEVES:
+        return ToolResult(
+            content=(
+                "Survey retrieve budget for this turn is used "
+                f"(max {_MAX_BROAD_RETRIEVES} searches). "
+                "Answer from the passages already returned; add a short coverage caveat "
+                "if the demo top_k cap may have omitted sections."
+            )
+        )
+
+    context.seen_retrieve_keys.add(effective_key)
+    context.retrieve_call_count += 1
 
     result = await context.rag_service.retrieve(
         context.user,
@@ -148,14 +178,21 @@ async def _retrieve_documents(arguments: dict[str, Any], context: ToolContext) -
 
     retrieved = result.chunks
     if not retrieved:
+        duplicate_hint = (
+            " Do not keep calling retrieve_documents with near-duplicate survey queries."
+            if broad
+            else (
+                " If the upload is not in English, retry retrieve_documents with "
+                "document-language keywords (e.g. 'Caso 1', company names)."
+            )
+        )
         return ToolResult(
             content=(
                 "No relevant passages found in uploaded documents. "
                 "Do not invent document content or citations. "
                 "Tell the user the uploaded files do not appear to answer this question, "
-                "or use web_search / answer_directly if appropriate. "
-                "If the upload is not in English, retry retrieve_documents with "
-                "document-language keywords (e.g. 'Caso 1', company names)."
+                "or use web_search / answer_directly if appropriate."
+                f"{duplicate_hint}"
             ),
             citations=[],
             retrieval_trace=trace,
@@ -230,7 +267,8 @@ async def _retrieve_documents(arguments: dict[str, Any], context: ToolContext) -
             f"This question would be better with about top_k={ideal_k} passages for fuller "
             f"coverage, but the demo capped retrieve at top_k={used_k}. "
             "Start your user-facing answer with a short caveat that this survey may omit "
-            "sections because of that demo cap, then list only what the passages support. "
+            "sections because of that demo cap (in the same language as the user's "
+            "question), then list only what the passages support. "
         )
     if query_looks_broad(query):
         budget_note += (

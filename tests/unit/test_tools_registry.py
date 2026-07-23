@@ -94,6 +94,97 @@ async def test_retrieve_includes_page_number() -> None:
 
 
 @pytest.mark.asyncio
+async def test_retrieve_rewrites_uuid_filename_in_citations() -> None:
+    chunk = MagicMock()
+    chunk.id = "chunk-1"
+    chunk.chunk_index = 0
+    chunk.page_number = 1
+    chunk.content = "Refund within 30 days."
+    document = MagicMock()
+    document.id = "doc-1"
+    document.filename = "a3f2c1b0-1234-5678-9abc-def012345678.pdf"
+    item = MagicMock(chunk=chunk, document=document, score=0.91)
+    rag = AsyncMock()
+    rag.settings = Settings(openai_api_key="test")
+    rag.retrieve.return_value = RetrievalResult(
+        chunks=[item],
+        trace=RetrievalTrace(
+            attempts=[
+                RetrievalAttempt(
+                    query="refund",
+                    grade="sufficient",
+                    chunk_count=1,
+                    top_k=5,
+                    top_k_max=8,
+                    ideal_top_k=5,
+                    budget_capped=False,
+                )
+            ],
+            final_query="refund",
+            top_k=5,
+        ),
+    )
+    result = await execute_tool(
+        "retrieve_documents",
+        {"query": "refund"},
+        ToolContext(user=MagicMock(), rag_service=rag),
+    )
+    assert result.citations[0].document_name == "Uploaded PDF"
+    assert "Uploaded PDF" in result.content
+
+
+@pytest.mark.asyncio
+async def test_retrieve_skips_duplicate_effective_survey_query() -> None:
+    chunk = MagicMock()
+    chunk.id = "chunk-1"
+    chunk.chunk_index = 0
+    chunk.page_number = None
+    chunk.content = "Caso 1 text"
+    document = MagicMock()
+    document.id = "doc-1"
+    document.filename = "casos.pdf"
+    item = MagicMock(chunk=chunk, document=document, score=0.8)
+    rag = AsyncMock()
+    rag.settings = Settings(openai_api_key="test")
+    rag.retrieve.return_value = RetrievalResult(
+        chunks=[item],
+        trace=RetrievalTrace(
+            attempts=[
+                RetrievalAttempt(
+                    query="resume todos los casos",
+                    grade="partial",
+                    chunk_count=1,
+                    top_k=8,
+                    top_k_max=8,
+                    ideal_top_k=20,
+                    budget_capped=True,
+                )
+            ],
+            final_query="resume todos los casos",
+            top_k=8,
+        ),
+    )
+    context = ToolContext(
+        user=MagicMock(),
+        rag_service=rag,
+        user_question="resume todos los casos del documento",
+    )
+    first = await execute_tool(
+        "retrieve_documents",
+        {"query": "Caso 1"},
+        context,
+    )
+    second = await execute_tool(
+        "retrieve_documents",
+        {"query": "Caso 2"},
+        context,
+    )
+    assert first.citations
+    assert "Already retrieved" in second.content
+    assert rag.retrieve.await_count == 1
+
+
+@pytest.mark.asyncio
 async def test_web_search_requires_query() -> None:
     result = await execute_tool(
         "web_search",
