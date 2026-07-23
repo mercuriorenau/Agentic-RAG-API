@@ -1,6 +1,6 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import {
-  askQuestion,
+  askQuestionStream,
   ChatItem,
   clearChatMessages,
   clearToken,
@@ -25,12 +25,14 @@ import {
   uploadDocument,
 } from "./api";
 import { AgentPath } from "./components/AgentPath";
-import { ASK_BUSY_PHASES, BusyStatus } from "./components/BusyStatus";
+import { BusyStatus, LiveBusyStep } from "./components/BusyStatus";
 import { Citations } from "./components/Citations";
 import { AnswerExplainerBlock, Explainer } from "./components/Explainer";
 import { DocumentPanel } from "./components/DocumentPanel";
 import { ProductTour, TourMode } from "./components/ProductTour";
 import { RetrievalTrace } from "./components/RetrievalTrace";
+import { ThinkingReplay } from "./components/ThinkingReplay";
+import { TypewriterText } from "./components/TypewriterText";
 import { TourLauncher } from "./components/TourLauncher";
 import { StackStrip } from "./components/StackStrip";
 import { AuthForm } from "./components/AuthForm";
@@ -57,8 +59,10 @@ import {
 } from "./tour/tourStorage";
 
 type ChatTurn = {
+  id: string;
   question: string;
   response: QueryResponse;
+  thinkingSteps?: LiveBusyStep[];
 };
 
 const FALLBACK_MODELS: ModelOption[] = [
@@ -82,7 +86,13 @@ export default function App() {
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const [busy, setBusy] = useState(false);
   const [busyKind, setBusyKind] = useState<"ask" | "upload" | "auth" | "other" | null>(null);
+  const [askSteps, setAskSteps] = useState<LiveBusyStep[]>([]);
+  const askStepsRef = useRef<LiveBusyStep[]>([]);
+  const [askHandoff, setAskHandoff] = useState(false);
+  const [typingTurnId, setTypingTurnId] = useState<string | null>(null);
+  const [openThinkingId, setOpenThinkingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const askCaughtUpRef = useRef<(() => void) | null>(null);
   const [userKey, setUserKey] = useState(getUserKey());
   const [tourMode, setTourMode] = useState<TourMode | null>(null);
   const [chatsFlipped, setChatsFlipped] = useState(false);
@@ -109,7 +119,12 @@ export default function App() {
       listChatMessages(chatId),
     ]);
     setDocuments(docs);
-    setTurns(turnsFromMessages(messages));
+    setTurns(
+      turnsFromMessages(messages).map((turn, index) => ({
+        ...turn,
+        id: `hist-${index}-${turn.question.slice(0, 24)}`,
+      })),
+    );
   }
 
   async function refreshModels() {
@@ -304,6 +319,17 @@ export default function App() {
     }
   }
 
+  function replaceAskSteps(next: LiveBusyStep[]) {
+    askStepsRef.current = next;
+    setAskSteps(next);
+  }
+
+  function appendAskStep(step: LiveBusyStep) {
+    const next = [...askStepsRef.current, step];
+    askStepsRef.current = next;
+    setAskSteps(next);
+  }
+
   async function handleAsk(event: FormEvent) {
     event.preventDefault();
     const trimmed = question.trim();
@@ -314,23 +340,71 @@ export default function App() {
       modelOptions.find((option) => option.id === selectedModelId) || FALLBACK_MODELS[0];
     setError(null);
     beginBusy("ask");
+    setAskHandoff(false);
+    replaceAskSteps([]);
+    setTypingTurnId(null);
     try {
       const history = historyFromTurns(turns);
-      const response = await askQuestion(
+      const response = await askQuestionStream(
         activeChatId,
         trimmed,
         selected.mode,
         selected.model_name,
         history,
+        (step) => {
+          appendAskStep({
+            id: `${Date.now()}-${askStepsRef.current.length}-${step.title}`,
+            title: step.title,
+            detail: step.detail,
+          });
+        },
       );
-      setTurns((prev) => [{ question: trimmed, response }, ...prev]);
+      appendAskStep({
+        id: `done-${Date.now()}`,
+        title: "Done",
+        detail: "Answer ready — writing reply",
+      });
+      await Promise.race([
+        new Promise<void>((resolve) => {
+          askCaughtUpRef.current = resolve;
+        }),
+        new Promise<void>((resolve) => window.setTimeout(resolve, 12000)),
+      ]);
+      askCaughtUpRef.current = null;
+
+      // 1) Fade thinking out while "Done" is still visible
+      setAskHandoff(true);
+      await new Promise((resolve) => window.setTimeout(resolve, 520));
+
+      // 2) Bring the answer card in (typing starts after a short beat)
+      const turnId = `ask-${Date.now()}`;
+      const thinkingSnapshot = [...askStepsRef.current];
+      setTypingTurnId(turnId);
+      setTurns((prev) => [
+        {
+          id: turnId,
+          question: trimmed,
+          response,
+          thinkingSteps: thinkingSnapshot,
+        },
+        ...prev,
+      ]);
+      setOpenThinkingId(null);
       setQuestion("");
+      await new Promise((resolve) => window.setTimeout(resolve, 720));
+
+      // 3) Remove thinking only after the handoff has played
+      endBusy();
+      setAskHandoff(false);
+      replaceAskSteps([]);
+
       const items = await listChats();
       setChats(items);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Query failed");
-    } finally {
       endBusy();
+      setAskHandoff(false);
+      replaceAskSteps([]);
     }
   }
 
@@ -693,7 +767,7 @@ export default function App() {
               {busyKind === "ask" ? (
                 <>
                   <span className="busy-spinner busy-spinner-inline" aria-hidden="true" />
-                  Thinking…
+                  {askHandoff ? "Done…" : "Thinking…"}
                 </>
               ) : (
                 "Ask"
@@ -702,8 +776,11 @@ export default function App() {
           </form>
           <BusyStatus
             active={busyKind === "ask"}
-            label="Working on your question"
-            phases={ASK_BUSY_PHASES}
+            label={askHandoff ? "Finishing up" : "Working on your question"}
+            liveSteps={askSteps}
+            storageKey="busy-ask-expanded"
+            className={askHandoff ? "is-handoff" : undefined}
+            onCaughtUp={() => askCaughtUpRef.current?.()}
           />
 
           <div className="turns" data-tour="turns">
@@ -713,12 +790,27 @@ export default function App() {
                 what the agent did.
               </p>
             ) : (
-              turns.map((turn, index) => {
+              turns.map((turn) => {
                 const walkthrough = explainAnswer(turn.response);
                 const coverage = coverageNotice(turn.response);
+                const isFresh = turn.id === typingTurnId;
                 return (
-                  <article key={`${turn.question}-${index}`} className="turn">
+                  <article
+                    key={turn.id}
+                    className={isFresh ? "turn turn-enter" : "turn"}
+                  >
                     <p className="question">{turn.question}</p>
+                    {turn.thinkingSteps && turn.thinkingSteps.length > 0 ? (
+                      <ThinkingReplay
+                        steps={turn.thinkingSteps}
+                        open={openThinkingId === turn.id}
+                        onToggle={() =>
+                          setOpenThinkingId((current) =>
+                            current === turn.id ? null : turn.id,
+                          )
+                        }
+                      />
+                    ) : null}
                     {coverage ? (
                       <aside className="callout warning turn-coverage" role="status">
                         <strong>{coverage.title}</strong>
@@ -738,7 +830,15 @@ export default function App() {
                         align="end"
                       />
                     </div>
-                    <p className="answer">{turn.response.answer}</p>
+                    <TypewriterText
+                      as="p"
+                      className="answer"
+                      text={turn.response.answer}
+                      active={isFresh}
+                      charsPerTick={1}
+                      tickMs={16}
+                      delayMs={380}
+                    />
                     <Citations citations={turn.response.citations} />
                     <RetrievalTrace attempts={turn.response.retrieval_trace} />
                   </article>
