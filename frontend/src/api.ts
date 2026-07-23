@@ -323,3 +323,92 @@ export async function askQuestion(
     true,
   );
 }
+
+export type AskProgressStep = {
+  title: string;
+  detail?: string;
+};
+
+export async function askQuestionStream(
+  chatId: string,
+  question: string,
+  modelMode: string,
+  modelName: string | null | undefined,
+  history: ConversationTurn[],
+  onStep: (step: AskProgressStep) => void,
+): Promise<QueryResponse> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated");
+  }
+  const response = await fetch("/api/v1/queries/stream", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      Accept: "text/event-stream",
+    },
+    body: JSON.stringify({
+      chat_id: chatId,
+      question,
+      model_mode: modelMode,
+      model_name: modelName?.trim() || null,
+      history,
+    }),
+  });
+  if (!response.ok) {
+    let detail = `Request failed (${response.status})`;
+    try {
+      const data = await response.json();
+      if (typeof data?.detail === "string") {
+        detail = data.detail;
+      }
+    } catch {
+      /* ignore */
+    }
+    throw new Error(detail);
+  }
+  if (!response.body) {
+    throw new Error("No response stream");
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let finalResponse: QueryResponse | null = null;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) {
+      break;
+    }
+    buffer += decoder.decode(value, { stream: true });
+    const chunks = buffer.split("\n\n");
+    buffer = chunks.pop() || "";
+    for (const chunk of chunks) {
+      const line = chunk
+        .split("\n")
+        .map((part) => part.trim())
+        .find((part) => part.startsWith("data:"));
+      if (!line) {
+        continue;
+      }
+      const payload = JSON.parse(line.replace(/^data:\s*/, ""));
+      if (payload.type === "step") {
+        onStep({
+          title: String(payload.title || "Working"),
+          detail: payload.detail ? String(payload.detail) : undefined,
+        });
+      } else if (payload.type === "done") {
+        finalResponse = payload.response as QueryResponse;
+      } else if (payload.type === "error") {
+        throw new Error(String(payload.detail || "Query failed"));
+      }
+    }
+  }
+
+  if (!finalResponse) {
+    throw new Error("Stream ended without a response");
+  }
+  return finalResponse;
+}

@@ -1,4 +1,5 @@
 import uuid
+from collections.abc import Awaitable, Callable
 
 from sqlalchemy import select
 
@@ -13,6 +14,14 @@ from app.services.rag_service import RAGService
 from app.services.tools import TOOL_SPECS, ToolContext, execute_tool
 
 logger = get_logger(__name__)
+
+ProgressCallback = Callable[[str, str], Awaitable[None]]
+
+_TOOL_STEP_TITLES = {
+    "retrieve_documents": "Search uploads",
+    "web_search": "Web search",
+    "answer_directly": "Answer directly",
+}
 
 SYSTEM_PROMPT = (
     "You are an agent that answers user questions using tools when helpful. "
@@ -119,8 +128,14 @@ class AgentService:
         model_mode: str = "auto",
         model_name: str | None = None,
         history: list[ConversationTurn] | None = None,
+        on_progress: ProgressCallback | None = None,
     ) -> QueryResponse:
+        async def emit(title: str, detail: str = "") -> None:
+            if on_progress:
+                await on_progress(title, detail)
+
         prior = _trim_history(history or [], self.settings.conversation_history_max_turns)
+        await emit("Inspect question", "Choosing a model for this ask")
         selection_text = _selection_text(question, prior)
         selection = select_model(
             selection_text,
@@ -128,12 +143,21 @@ class AgentService:
             requested_mode=model_mode,
             requested_model=model_name,
         )
+        await emit(
+            "Picked model",
+            f"{selection.provider} / {selection.model}",
+        )
         llm = self.llm or get_llm_provider(
             self.settings,
             provider_name=selection.provider,
             model_name=selection.model,
         )
         ready_docs = await _list_ready_documents(self.rag_service, user, chat_id)
+        if ready_docs:
+            await emit(
+                "Chat uploads ready",
+                ", ".join(ready_docs[:4]) + ("…" if len(ready_docs) > 4 else ""),
+            )
         messages: list[ChatMessage] = [
             ChatMessage(
                 role="system",
@@ -159,6 +183,13 @@ class AgentService:
         forced_retrieve_nudge = False
 
         for _ in range(self.settings.agent_max_tool_rounds):
+            if tools_used:
+                await emit(
+                    "Writing answer",
+                    "Grounding the reply in the passages already retrieved",
+                )
+            else:
+                await emit("Planning", "Choosing retrieve, web, or direct")
             result = await llm.chat_with_tools(messages, TOOL_SPECS)
             if not result.tool_calls:
                 if (
@@ -173,6 +204,10 @@ class AgentService:
                         user_id=str(user.id),
                         chat_id=str(chat_id) if chat_id else None,
                         documents=ready_docs,
+                    )
+                    await emit(
+                        "Nudge retrieve",
+                        "Model answered without tools — requiring a document search",
                     )
                     messages.append(
                         ChatMessage(
@@ -229,7 +264,14 @@ class AgentService:
 
             for call in result.tool_calls:
                 tools_used.append(call.name)
+                tool_title = _TOOL_STEP_TITLES.get(call.name, call.name)
+                tool_detail = _tool_progress_detail(call.name, call.arguments)
+                await emit(tool_title, tool_detail)
                 tool_result = await execute_tool(call.name, call.arguments, context)
+                await emit(
+                    f"{tool_title} done",
+                    _tool_result_detail(call.name, tool_result),
+                )
                 for citation in tool_result.citations:
                     key = _citation_key(citation)
                     if key not in seen_citation_keys:
@@ -246,6 +288,7 @@ class AgentService:
                     )
                 )
 
+        await emit("Writing answer", "Max tool rounds reached — finalizing")
         final = await llm.chat_with_tools(messages, tools=[])
         answer = (final.content or "").strip() or "I could not produce an answer."
         route = resolve_route(tools_used)
@@ -266,6 +309,34 @@ class AgentService:
             model_selection_explanation=selection.explanation,
             retrieval_trace=retrieval_trace or None,
         )
+
+
+def _tool_progress_detail(name: str, arguments: dict) -> str:
+    query = str(arguments.get("query") or "").strip()
+    if name == "retrieve_documents" and query:
+        return f'query “{query[:120]}”'
+    if name == "web_search" and query:
+        return f'query “{query[:120]}”'
+    if name == "answer_directly":
+        reason = str(arguments.get("reason") or "").strip()
+        return reason[:160] if reason else "general knowledge"
+    return ""
+
+
+def _tool_result_detail(name: str, tool_result) -> str:
+    if name == "retrieve_documents":
+        count = len(tool_result.citations)
+        if count:
+            return f"{count} citation(s) from uploads"
+        if "Already retrieved" in tool_result.content:
+            return "skipped duplicate search"
+        if "Survey retrieve budget" in tool_result.content:
+            return "survey retrieve cap reached"
+        return "no matching passages"
+    if name == "web_search":
+        count = len(tool_result.citations)
+        return f"{count} web result(s)" if count else "no web hits"
+    return "ok"
 
 
 def _citation_key(citation: Citation) -> str:
