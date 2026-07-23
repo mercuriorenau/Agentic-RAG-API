@@ -4,6 +4,7 @@ from uuid import UUID
 
 from app.models import User
 from app.schemas.query import Citation
+from app.services.document_names import display_document_name
 from app.services.llm.base import ToolSpec
 from app.services.rag_service import RAGService
 from app.services.retrieval_budget import query_looks_broad, resolve_retrieval_budget
@@ -165,15 +166,16 @@ async def _retrieve_documents(arguments: dict[str, Any], context: ToolContext) -
     for item in retrieved:
         page = item.chunk.page_number
         page_label = f" | page {page}" if page is not None else ""
+        doc_label = display_document_name(item.document.filename)
         blocks.append(
-            f"[{item.document.filename} | chunk {item.chunk.chunk_index}{page_label}]\n"
+            f"[{doc_label} | chunk {item.chunk.chunk_index}{page_label}]\n"
             f"{item.chunk.content}"
         )
         citations.append(
             Citation(
                 source_type="document",
                 document_id=str(item.document.id),
-                document_name=item.document.filename,
+                document_name=doc_label,
                 chunk_id=str(item.chunk.id),
                 page_number=page,
                 excerpt=item.chunk.content[:300],

@@ -2,6 +2,7 @@ import { ChangeEvent, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { DocumentItem, fetchDocumentBlob } from "../api";
 import { DOC_UPLOAD } from "../explainers";
+import { displayDocumentName } from "../documentNames";
 import { BusyStatus, UPLOAD_BUSY_PHASES } from "./BusyStatus";
 import { Explainer } from "./Explainer";
 
@@ -65,7 +66,7 @@ export function DocumentPanel({ documents, busy, uploading = false, onUpload, on
       if (preview?.url) {
         URL.revokeObjectURL(preview.url);
       }
-      const { blob } = await fetchDocumentBlob(doc.id);
+      const { blob, filenameHint } = await fetchDocumentBlob(doc.id, doc.filename);
       const mime =
         doc.content_type ||
         blob.type ||
@@ -82,7 +83,7 @@ export function DocumentPanel({ documents, busy, uploading = false, onUpload, on
       }
       setPreview({
         url,
-        filename: doc.filename,
+        filename: displayDocumentName(filenameHint || doc.filename),
         contentType: mime,
         text,
       });
@@ -139,7 +140,7 @@ export function DocumentPanel({ documents, busy, uploading = false, onUpload, on
           {documents.map((doc) => (
             <li key={doc.id}>
               <div className="doc-meta">
-                <strong title={doc.filename}>{doc.filename}</strong>
+                <strong title={doc.filename}>{displayDocumentName(doc.filename)}</strong>
                 <span className={`status ${doc.status}`}>{doc.status}</span>
               </div>
               <div className="doc-actions">
