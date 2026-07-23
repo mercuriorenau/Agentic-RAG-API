@@ -241,7 +241,10 @@ export async function deleteDocument(id: string): Promise<void> {
   await request(`/api/v1/documents/${id}`, { method: "DELETE" }, true);
 }
 
-export async function fetchDocumentBlob(id: string): Promise<{ blob: Blob; filenameHint: string }> {
+export async function fetchDocumentBlob(
+  id: string,
+  fallbackFilename?: string,
+): Promise<{ blob: Blob; filenameHint: string }> {
   const token = getToken();
   if (!token) {
     throw new Error("Not authenticated");
@@ -253,7 +256,32 @@ export async function fetchDocumentBlob(id: string): Promise<{ blob: Blob; filen
     throw new Error(`Preview failed (${response.status})`);
   }
   const blob = await response.blob();
-  return { blob, filenameHint: id };
+  const fromHeader = filenameFromContentDisposition(
+    response.headers.get("content-disposition"),
+  );
+  return {
+    blob,
+    filenameHint: fromHeader || fallbackFilename || "document",
+  };
+}
+
+function filenameFromContentDisposition(header: string | null): string | null {
+  if (!header) {
+    return null;
+  }
+  const utf = /filename\*=UTF-8''([^;]+)/i.exec(header);
+  if (utf?.[1]) {
+    try {
+      return decodeURIComponent(utf[1].trim().replace(/^"|"$/g, ""));
+    } catch {
+      return utf[1].trim().replace(/^"|"$/g, "");
+    }
+  }
+  const plain = /filename="([^"]+)"/i.exec(header) || /filename=([^;]+)/i.exec(header);
+  if (plain?.[1]) {
+    return plain[1].trim().replace(/^"|"$/g, "");
+  }
+  return null;
 }
 
 export async function listModels(): Promise<ModelOption[]> {

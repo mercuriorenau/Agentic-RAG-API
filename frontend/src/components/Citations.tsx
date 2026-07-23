@@ -1,5 +1,6 @@
 import { Citation } from "../api";
 import { CITATIONS } from "../explainers";
+import { displayDocumentName } from "../documentNames";
 import { Explainer } from "./Explainer";
 
 type Props = {
@@ -22,7 +23,9 @@ export function Citations({ citations }: Props) {
           <li key={`${citation.chunk_id || citation.url || citation.excerpt}-${index}`}>
             <div className="citation-head">
               <span className="badge subtle">{citation.source_type}</span>
-              {citation.document_name ? <strong>{citation.document_name}</strong> : null}
+              {citation.document_name ? (
+                <strong>{displayDocumentName(citation.document_name)}</strong>
+              ) : null}
               {citation.page_number != null ? (
                 <span className="muted">page {citation.page_number}</span>
               ) : null}

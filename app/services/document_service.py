@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import Settings, get_settings
 from app.core.logging import get_logger
 from app.models import Chat, Chunk, Document, User
+from app.services.document_names import sanitize_upload_filename
 from app.services.embedding_service import EmbeddingService
 from app.utils.extractors import (
     UnsupportedFileTypeError,
@@ -72,6 +73,7 @@ class DocumentService:
         if chat is None:
             raise LookupError("Chat not found")
 
+        filename = sanitize_upload_filename(filename)
         suffix = Path(filename).suffix.lower()
         if suffix not in ALLOWED_EXTENSIONS and content_type not in ALLOWED_CONTENT_TYPES:
             raise UnsupportedFileTypeError("Only PDF, TXT, and Markdown files are supported")
