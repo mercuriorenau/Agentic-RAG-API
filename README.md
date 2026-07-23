@@ -172,12 +172,32 @@ Live mode needs `DATABASE_URL`, `OPENAI_API_KEY` (embeddings), and a running Pos
 
 Pytest covers the scorers under `tests/evals/`.
 
+### Latest offline results
+
+`python -m evals.run_evals` — **9/9 passed** (heuristic scorers on canned samples; not live retrieval).
+
+| Case | Relevance | Groundedness | Route |
+|------|-----------|--------------|-------|
+| retrieve_refund | 1.0 | 0.667 | 1.0 |
+| direct_greeting | 1.0 | 1.0 | 1.0 |
+| web_current_event | 0.0 | 0.429 | 1.0 |
+| retrieve_shipping | 1.0 | 1.0 | 1.0 |
+| ungrounded_hallucination | 1.0 | 0.111 | 1.0 |
+| retrieve_lexical_sku | 1.0 | 1.0 | 1.0 |
+| retrieve_multi_doc | 0.75 | 0.615 | 1.0 |
+| retrieve_no_relevant | 1.0 | 1.0 | 1.0 |
+| retrieve_paraphrase_return_window | 1.0 | 0.571 | 1.0 |
+
+Low relevance on `web_current_event` and low groundedness on `ungrounded_hallucination` are expected in the fixture design (web path / intentional weak grounding). Re-run the command after changing scorers or cases and refresh this table.
+
 ## RAG quality knobs
 
 | Variable | Role | Default |
 |----------|------|---------|
 | `CHUNK_SIZE` / `CHUNK_OVERLAP` | Paragraph-aware chunk windows | `800` / `100` |
-| `TOP_K` | Final passages passed to the agent | `5` |
+| `TOP_K` | Base passages for focused questions | `5` |
+| `TOP_K_MAX` | Hard cap when adaptive retrieval widens the budget | `8` |
+| `ADAPTIVE_TOP_K` | Raise `top_k` toward the max for broad/survey queries | `true` |
 | `CANDIDATE_MULTIPLIER` | Dense/FTS pool size = `TOP_K * multiplier` | `4` |
 | `RETRIEVAL_MIN_SCORE` | Drop weak matches (cosine or mapped FTS) | `0.25` |
 | `RERANK_ENABLED` | LLM listwise rerank after fusion | `true` |
@@ -187,7 +207,7 @@ Pytest covers the scorers under `tests/evals/`.
 
 Self-RAG and rerank add small-model calls per retrieve, so latency and cost rise slightly when enabled.
 
-After changing chunking settings, **re-upload documents** so chunks and embeddings regenerate. Older uploads keep their previous chunk boundaries.
+**Adaptive `top_k` (token budget):** focused questions stay near `TOP_K`. Broad prompts (“each case”, “summarize the document”, “todos los casos”) may use a higher value up to `TOP_K_MAX` (default 8). The agent still does **not** load the whole PDF — incomplete coverage on survey questions is an intentional cost limit for this demo, not a broken index. Prefer one case/section per question for fuller answers. For best demo results, keep uploads around **15 pages or fewer**; longer files work better with focused questions. After changing chunking settings, **re-upload documents** so chunks and embeddings regenerate. Older uploads keep their previous chunk boundaries.
 
 ## Environment variables
 
@@ -204,7 +224,9 @@ After changing chunking settings, **re-upload documents** so chunks and embeddin
 | `ANTHROPIC_CHAT_MODEL` | Anthropic chat model | `claude-sonnet-4-5` |
 | `CHUNK_SIZE` | Characters per chunk | `800` |
 | `CHUNK_OVERLAP` | Chunk overlap | `100` |
-| `TOP_K` | Final chunks passed to the agent | `5` |
+| `TOP_K` | Base chunks for focused questions | `5` |
+| `TOP_K_MAX` | Hard cap for adaptive broad queries | `8` |
+| `ADAPTIVE_TOP_K` | Enable adaptive top_k | `true` |
 | `CANDIDATE_MULTIPLIER` | Hybrid candidate pool multiplier | `4` |
 | `RETRIEVAL_MIN_SCORE` | Minimum retrieve score (0-1) | `0.25` |
 | `RERANK_ENABLED` | Enable LLM rerank after hybrid fusion | `true` |
