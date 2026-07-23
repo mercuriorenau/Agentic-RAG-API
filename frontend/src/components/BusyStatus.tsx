@@ -25,9 +25,9 @@ type Props = {
   onCaughtUp?: () => void;
 };
 
-const THINK_TICK_MS = 28;
-const THINK_CHARS = 1;
-const MIN_STEP_HOLD_MS = 320;
+const THINK_TICK_MS = 22;
+const THINK_CHARS = 2;
+const MIN_STEP_HOLD_MS = 180;
 
 function loadExpanded(storageKey: string | undefined, fallback: boolean): boolean {
   if (!storageKey || typeof window === "undefined") {

@@ -28,6 +28,10 @@ export function TypewriterText({
   const [shown, setShown] = useState(active ? "" : text);
   const Tag = as;
   const completedFor = useRef<string | null>(null);
+  // Keep the latest callback without restarting the typewriter on parent re-renders
+  // (e.g. when new SSE steps append while the current line is still typing).
+  const onCompleteRef = useRef(onComplete);
+  onCompleteRef.current = onComplete;
 
   useEffect(() => {
     completedFor.current = null;
@@ -51,7 +55,7 @@ export function TypewriterText({
           }
           if (completedFor.current !== text) {
             completedFor.current = text;
-            onComplete?.();
+            onCompleteRef.current?.();
           }
         }
       }, tickMs);
@@ -65,7 +69,7 @@ export function TypewriterText({
         window.clearInterval(intervalId);
       }
     };
-  }, [active, text, charsPerTick, tickMs, delayMs, onComplete]);
+  }, [active, text, charsPerTick, tickMs, delayMs]);
 
   return (
     <Tag className={className}>
