@@ -25,10 +25,16 @@ SYSTEM_PROMPT = (
     "'this file', 'the PDF', 'each case', or 'the upload' as referring to those files — "
     "call retrieve_documents before answering. Do not ask which document if only one "
     "ready file is listed. Do not answer document-content questions with no tool call. "
-    "For survey questions that ask about many cases/sections, call retrieve_documents "
-    "multiple times with different concrete queries (case numbers, company names, "
-    "document-language keywords) instead of one abstract English paraphrase. "
+    "For survey questions that ask about many cases/sections, prefer one "
+    "retrieve_documents call using the user's wording or document-language keywords. "
+    "At most one follow-up retrieve if the first return is empty or irrelevant — "
+    "do not fan out many similar searches. "
     "After tool results arrive, produce a final answer. "
+    "CRITICAL language rule: write the ENTIRE final answer in the language of the "
+    "user's latest question only — including coverage caveats and follow-up offers. "
+    "Do not follow the document language, citation language, or prior-turn language "
+    "when choosing reply language. Example: English question → English answer even if "
+    "the PDF and earlier chat turns are Spanish. "
     "When document or web context is provided, ground every factual claim in that context "
     "and do not invent unsupported facts, numbers, or document details. "
     "Retrieve returns only a small adaptive chunk budget (not the whole file) to control "
@@ -43,6 +49,8 @@ SYSTEM_PROMPT = (
     "If context is insufficient, say you do not know. "
     "You may receive prior conversation turns. Resolve pronouns and follow-ups from that "
     "history (for example 'he', 'she', 'that resume', 'the person above'). "
+    "Prior turns may be in a different language — still answer the latest question in "
+    "that question's language. "
     "If a follow-up still needs facts from uploaded files, call retrieve_documents again "
     "with a clear search query; otherwise answer using the prior turns."
 )
@@ -129,7 +137,7 @@ class AgentService:
         messages: list[ChatMessage] = [
             ChatMessage(
                 role="system",
-                content=_system_prompt(selection, ready_docs),
+                content=_system_prompt(selection, ready_docs, question),
             ),
         ]
         for turn in prior:
@@ -291,7 +299,11 @@ def _selection_text(question: str, history: list[ConversationTurn]) -> str:
     return f"{prior}\n{question}"
 
 
-def _system_prompt(selection: ModelSelection, ready_docs: list[str]) -> str:
+def _system_prompt(
+    selection: ModelSelection,
+    ready_docs: list[str],
+    question: str,
+) -> str:
     if ready_docs:
         listed = ", ".join(ready_docs)
         upload_context = (
@@ -305,11 +317,20 @@ def _system_prompt(selection: ModelSelection, ready_docs: list[str]) -> str:
             "If the user asks about an upload that is missing, say so and ask them to "
             "upload a file before retrieve_documents can help."
         )
+    clipped = " ".join(question.strip().split())
+    if len(clipped) > 220:
+        clipped = f"{clipped[:220]}…"
+    language_lock = (
+        f"Latest user question: «{clipped}». "
+        "Reply language lock: the full final answer must match that question's language "
+        "(not the upload language, not earlier turns)."
+    )
     return (
         f"{SYSTEM_PROMPT} {upload_context} "
         f"Model selection context: {selection.explanation} "
         "If the user asks why a model or tool was chosen, explain this decision process "
-        "briefly without mentioning private API keys or internal settings."
+        "briefly without mentioning private API keys or internal settings. "
+        f"{language_lock}"
     )
 
 
