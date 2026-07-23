@@ -250,22 +250,3 @@ export function BusyStatus({
     </div>
   );
 }
-
-export const UPLOAD_BUSY_PHASES: BusyPhase[] = [
-  {
-    title: "Upload the file",
-    detail: "Sending the PDF/TXT/Markdown into this chat’s private store.",
-  },
-  {
-    title: "Extract text",
-    detail: "Page-aware extraction pulls readable text from the file.",
-  },
-  {
-    title: "Chunk and embed",
-    detail: "Paragraph windows are embedded with text-embedding-3-small.",
-  },
-  {
-    title: "Save vectors in Postgres",
-    detail: "Chunks land in pgvector under this chat only.",
-  },
-];

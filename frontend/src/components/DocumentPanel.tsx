@@ -3,7 +3,6 @@ import { createPortal } from "react-dom";
 import { DocumentItem, fetchDocumentBlob } from "../api";
 import { DOC_UPLOAD } from "../explainers";
 import { displayDocumentName } from "../documentNames";
-import { BusyStatus, UPLOAD_BUSY_PHASES } from "./BusyStatus";
 import { Explainer } from "./Explainer";
 
 type Props = {
@@ -127,11 +126,12 @@ export function DocumentPanel({ documents, busy, uploading = false, onUpload, on
           onChange={handleChange}
         />
       </div>
-      <BusyStatus
-        active={uploading}
-        label="Indexing document"
-        phases={UPLOAD_BUSY_PHASES}
-      />
+      {uploading ? (
+        <p className="upload-busy" role="status" aria-live="polite" aria-busy="true">
+          <span className="busy-spinner busy-spinner-inline" aria-hidden="true" />
+          Indexing document…
+        </p>
+      ) : null}
       {previewError ? <p className="form-error">{previewError}</p> : null}
       {documents.length === 0 ? (
         <p className="muted compact-muted">No files in this chat yet.</p>
