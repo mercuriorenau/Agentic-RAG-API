@@ -11,6 +11,7 @@ from app.models import User
 from app.schemas.auth import (
     EmailOnlyRequest,
     MessageResponse,
+    ResetPasswordRequest,
     TokenResponse,
     UserLogin,
     UserRegister,
@@ -103,6 +104,34 @@ async def resend_verification(
         detail="If that email needs verification, a new link and code were sent."
     )
 
+
+@router.post("/forgot-password", response_model=MessageResponse)
+@limiter.limit(get_settings().rate_limit_auth)
+async def forgot_password(
+    request: Request,
+    data: EmailOnlyRequest,
+    auth_service: AuthService = Depends(get_auth_service),
+) -> MessageResponse:
+    await auth_service.request_password_reset(data.email)
+    return MessageResponse(
+        detail="If that account can reset a password, a code was sent to the email."
+    )
+
+
+@router.post("/reset-password", response_model=TokenResponse)
+@limiter.limit(get_settings().rate_limit_auth)
+async def reset_password(
+    request: Request,
+    data: ResetPasswordRequest,
+    auth_service: AuthService = Depends(get_auth_service),
+) -> TokenResponse:
+    user = await auth_service.reset_password(
+        email=data.email,
+        code=data.code,
+        new_password=data.new_password,
+    )
+    token = auth_service.create_token_for_user(user)
+    return TokenResponse(access_token=token)
 
 
 @router.get("/google")

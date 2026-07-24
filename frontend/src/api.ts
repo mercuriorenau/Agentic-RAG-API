@@ -172,6 +172,27 @@ export async function resendVerification(email: string): Promise<string> {
   return data.detail;
 }
 
+export async function forgotPassword(email: string): Promise<string> {
+  const data = await request<{ detail: string }>("/api/v1/auth/forgot-password", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+  return data.detail;
+}
+
+export async function resetPassword(
+  email: string,
+  code: string,
+  newPassword: string,
+): Promise<void> {
+  const data = await request<{ access_token: string }>("/api/v1/auth/reset-password", {
+    method: "POST",
+    body: JSON.stringify({ email, code, new_password: newPassword }),
+  });
+  setToken(data.access_token);
+  setUserKey(email);
+}
+
 export async function listChats(): Promise<ChatItem[]> {
   const data = await request<{ chats: ChatItem[] }>("/api/v1/chats", {}, true);
   return data.chats;

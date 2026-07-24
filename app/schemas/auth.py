@@ -20,6 +20,11 @@ class VerifyEmailCodeRequest(BaseModel):
     code: str = Field(min_length=6, max_length=6)
 
 
+class ResetPasswordRequest(BaseModel):
+    email: EmailStr
+    code: str = Field(min_length=6, max_length=6)
+    new_password: str = Field(min_length=5, max_length=20)
+
 
 class TokenResponse(BaseModel):
     access_token: str
@@ -34,5 +39,6 @@ class UserResponse(BaseModel):
     id: str
     email: str
     email_verified: bool = False
+    rate_limit_exempt: bool = False
 
     model_config = {"from_attributes": True}

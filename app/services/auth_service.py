@@ -11,6 +11,7 @@ from app.core.security import create_access_token, get_password_hash, verify_pas
 from app.models import PendingSignup, User
 from app.schemas.auth import UserRegister
 from app.services.email_service import (
+    send_password_reset_email,
     send_verification_email,
     smtp_configured,
 )
@@ -113,6 +114,7 @@ class AuthService:
                 user.email = email
             user.email_verified = True
             self._clear_verification_secrets(user)
+            self._clear_password_reset(user)
             await self.db.flush()
             return user
 
@@ -122,6 +124,7 @@ class AuthService:
             user.google_sub = google_sub
             user.email_verified = True
             self._clear_verification_secrets(user)
+            self._clear_password_reset(user)
             await self.db.flush()
             return user
 
@@ -195,7 +198,62 @@ class AuthService:
             return
         await self._issue_and_send_user_verification(user)
 
+    async def request_password_reset(self, email: str) -> None:
+        """Send a reset code. Does not change the password until the code is confirmed."""
+        self._require_smtp()
+        email = email.strip().lower()
+        user = await self._get_user_by_email(email)
+        # Only verified password accounts can reset. Always return quietly otherwise.
+        if (
+            not user
+            or not user.email_verified
+            or not user.hashed_password
+        ):
+            return
 
+        code = f"{secrets.randbelow(1_000_000):06d}"
+        user.password_reset_code_hash = get_password_hash(code)
+        user.password_reset_expires_at = datetime.now(UTC) + timedelta(
+            minutes=self.settings.email_verification_expire_minutes
+        )
+        await self.db.flush()
+        try:
+            await send_password_reset_email(
+                to_email=user.email,
+                code=code,
+                settings=self.settings,
+            )
+        except Exception:
+            # Roll back reset secrets so a failed send leaves the account unchanged.
+            self._clear_password_reset(user)
+            await self.db.flush()
+            raise
+
+    async def reset_password(self, *, email: str, code: str, new_password: str) -> User:
+        email = email.strip().lower()
+        user = await self._get_user_by_email(email)
+        if (
+            not user
+            or not user.email_verified
+            or not user.hashed_password
+            or not user.password_reset_code_hash
+            or not user.password_reset_expires_at
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid or expired reset code",
+            )
+        self._assert_code_valid(
+            code=code.strip(),
+            code_hash=user.password_reset_code_hash,
+            expires_at=user.password_reset_expires_at,
+            invalid_detail="Invalid or expired reset code",
+            expired_detail="Reset code expired. Request a new one.",
+        )
+        user.hashed_password = get_password_hash(new_password)
+        self._clear_password_reset(user)
+        await self.db.flush()
+        return user
 
     async def get_user_by_id(self, user_id: uuid.UUID) -> User | None:
         result = await self.db.execute(select(User).where(User.id == user_id))
@@ -342,3 +400,7 @@ class AuthService:
         user.email_verify_code_hash = None
         user.email_verify_expires_at = None
 
+    @staticmethod
+    def _clear_password_reset(user: User) -> None:
+        user.password_reset_code_hash = None
+        user.password_reset_expires_at = None
