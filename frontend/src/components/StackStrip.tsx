@@ -1,12 +1,18 @@
 const STACK_ITEMS = [
-  { name: "OpenAI", icon: "ai" },
-  { name: "Claude", icon: "chat" },
+  { name: "OpenAI", icon: "chat" },
+  { name: "Claude", icon: "ai" },
   { name: "Tavily", icon: "search" },
   { name: "Railway", icon: "deploy" },
   { name: "PostgreSQL", icon: "database" },
   { name: "pgvector", icon: "vectordb" },
+  { name: "SQLAlchemy", icon: "orm" },
+  { name: "Alembic", icon: "migrate" },
   { name: "FastAPI", icon: "api" },
   { name: "React", icon: "ui" },
+  { name: "TypeScript", icon: "language" },
+  { name: "Vite", icon: "build" },
+  { name: "Google Auth", icon: "auth" },
+  { name: "Docker", icon: "container" },
 ] as const;
 
 type IconKind = (typeof STACK_ITEMS)[number]["icon"];
@@ -74,6 +80,24 @@ function SemanticIcon({ kind }: { kind: IconKind }) {
           <circle cx="12.5" cy="10.2" r="1.1" fill="currentColor" stroke="none" />
         </svg>
       );
+    case "orm":
+      return (
+        <svg {...props}>
+          <rect x="4" y="5" width="7" height="6" rx="1" />
+          <rect x="13" y="5" width="7" height="6" rx="1" />
+          <rect x="8.5" y="13" width="7" height="6" rx="1" />
+          <path d="M7.5 11v1.2M16.5 11v1.2M12 11.5v1.5" />
+        </svg>
+      );
+    case "migrate":
+      return (
+        <svg {...props}>
+          <path d="M7 5v14M17 5v14" />
+          <path d="M4 8h6M14 16h6" />
+          <path d="M7 12h10" />
+          <path d="M14 9l3 3-3 3" />
+        </svg>
+      );
     case "api":
       return (
         <svg {...props}>
@@ -89,6 +113,37 @@ function SemanticIcon({ kind }: { kind: IconKind }) {
           <path d="M4 9h16M8 5v4" />
           <rect x="7" y="12" width="4" height="4" rx="0.6" />
           <path d="M13 13h4M13 16h3" />
+        </svg>
+      );
+    case "language":
+      return (
+        <svg {...props}>
+          <path d="M4 6h9M8.5 6v12" />
+          <path d="M14 18l3.2-8.5L20.4 18" />
+          <path d="M15.1 15h4.2" />
+        </svg>
+      );
+    case "build":
+      return (
+        <svg {...props}>
+          <path d="M5 19V9l7-5 7 5v10" />
+          <path d="M10 19v-5h4v5" />
+          <path d="M5 11.5h14" />
+        </svg>
+      );
+    case "auth":
+      return (
+        <svg {...props}>
+          <rect x="6" y="11" width="12" height="9" rx="1.5" />
+          <path d="M9 11V8a3 3 0 0 1 6 0v3" />
+          <circle cx="12" cy="15.5" r="1.2" />
+        </svg>
+      );
+    case "container":
+      return (
+        <svg {...props}>
+          <rect x="3.5" y="7" width="17" height="10" rx="1.5" />
+          <path d="M3.5 11h17M8 7v10M12 7v10M16 7v10" />
         </svg>
       );
   }

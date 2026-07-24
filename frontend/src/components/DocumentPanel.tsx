@@ -9,6 +9,8 @@ type Props = {
   documents: DocumentItem[];
   busy: boolean;
   uploading?: boolean;
+  rateLimited?: boolean;
+  lockCountdown?: string | null;
   onUpload: (file: File) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
 };
@@ -20,7 +22,15 @@ type PreviewState = {
   text?: string;
 };
 
-export function DocumentPanel({ documents, busy, uploading = false, onUpload, onDelete }: Props) {
+export function DocumentPanel({
+  documents,
+  busy,
+  uploading = false,
+  rateLimited = false,
+  lockCountdown = null,
+  onUpload,
+  onDelete,
+}: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<PreviewState | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
@@ -111,12 +121,31 @@ export function DocumentPanel({ documents, busy, uploading = false, onUpload, on
         </span>
         <button
           type="button"
-          className="linkish"
+          className={rateLimited ? "linkish upload-locked" : "linkish"}
           data-tour="upload-doc"
-          disabled={busy}
+          disabled={busy || rateLimited}
+          title={
+            rateLimited
+              ? `Upload locked — unlocks in ${lockCountdown}`
+              : undefined
+          }
           onClick={() => inputRef.current?.click()}
         >
-          {uploading ? "Indexing…" : "Upload"}
+          {rateLimited ? (
+            <>
+              <span className="lock-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="5" y="11" width="14" height="10" rx="2" />
+                  <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+                </svg>
+              </span>
+              Locked · {lockCountdown}
+            </>
+          ) : uploading ? (
+            "Indexing…"
+          ) : (
+            "Upload"
+          )}
         </button>
         <input
           ref={inputRef}
