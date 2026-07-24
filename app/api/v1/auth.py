@@ -4,10 +4,19 @@ from urllib.parse import urlencode
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
 
-from app.api.deps import get_auth_service
+from app.api.deps import get_auth_service, get_current_user
 from app.core.config import get_settings
 from app.core.rate_limit import limiter
-from app.schemas.auth import TokenResponse, UserLogin, UserRegister, UserResponse
+from app.models import User
+from app.schemas.auth import (
+    EmailOnlyRequest,
+    MessageResponse,
+    TokenResponse,
+    UserLogin,
+    UserRegister,
+    UserResponse,
+    VerifyEmailCodeRequest,
+)
 from app.services.auth_service import AuthService
 from app.services.google_oauth import (
     build_google_authorize_url,
@@ -26,7 +35,12 @@ async def register(
     auth_service: AuthService = Depends(get_auth_service),
 ) -> UserResponse:
     user = await auth_service.register(data)
-    return UserResponse(id=str(user.id), email=user.email)
+    return UserResponse(
+        id=str(user.id),
+        email=user.email,
+        email_verified=False,
+    )
+
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -39,6 +53,56 @@ async def login(
     user = await auth_service.authenticate(data.email, data.password)
     token = auth_service.create_token_for_user(user)
     return TokenResponse(access_token=token)
+
+
+@router.post("/verify-email", response_model=TokenResponse)
+@limiter.limit(get_settings().rate_limit_auth)
+async def verify_email_code(
+    request: Request,
+    data: VerifyEmailCodeRequest,
+    auth_service: AuthService = Depends(get_auth_service),
+) -> TokenResponse:
+    user = await auth_service.verify_email_code(data.email, data.code)
+    token = auth_service.create_token_for_user(user)
+    return TokenResponse(access_token=token)
+
+
+@router.get("/verify-email")
+@limiter.limit(get_settings().rate_limit_auth)
+async def verify_email_link(
+    request: Request,
+    token: str | None = None,
+    auth_service: AuthService = Depends(get_auth_service),
+) -> RedirectResponse:
+    settings = get_settings()
+    if not token:
+        return _frontend_redirect(settings, error="Missing verification token")
+    try:
+        user = await auth_service.verify_email_token(token)
+        access_token = auth_service.create_token_for_user(user)
+    except HTTPException as exc:
+        detail = exc.detail if isinstance(exc.detail, str) else "Verification failed"
+        return _frontend_redirect(settings, error=detail)
+    return _frontend_redirect(
+        settings,
+        token=access_token,
+        email=user.email,
+        verified=True,
+    )
+
+
+@router.post("/resend-verification", response_model=MessageResponse)
+@limiter.limit(get_settings().rate_limit_auth)
+async def resend_verification(
+    request: Request,
+    data: EmailOnlyRequest,
+    auth_service: AuthService = Depends(get_auth_service),
+) -> MessageResponse:
+    await auth_service.resend_verification(data.email)
+    return MessageResponse(
+        detail="If that email needs verification, a new link and code were sent."
+    )
+
 
 
 @router.get("/google")
@@ -108,6 +172,7 @@ def _frontend_redirect(
     token: str | None = None,
     email: str | None = None,
     error: str | None = None,
+    verified: bool = False,
 ) -> RedirectResponse:
     params: dict[str, str] = {}
     if token:
@@ -116,6 +181,8 @@ def _frontend_redirect(
         params["auth_email"] = email
     if error:
         params["auth_error"] = error
+    if verified:
+        params["email_verified"] = "1"
     query = f"?{urlencode(params)}" if params else ""
     response = RedirectResponse(url=f"{settings.app_public_url.rstrip('/')}{query}")
     return response

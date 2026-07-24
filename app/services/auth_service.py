@@ -1,37 +1,60 @@
+import secrets
 import uuid
+from datetime import UTC, datetime, timedelta
 
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_settings
 from app.core.security import create_access_token, get_password_hash, verify_password
 from app.models import User
 from app.schemas.auth import UserRegister
+from app.services.email_service import send_verification_email, smtp_configured
 
 
 class AuthService:
     def __init__(self, db: AsyncSession) -> None:
         self.db = db
+        self.settings = get_settings()
 
     async def register(self, data: UserRegister) -> User:
-        existing = await self.db.execute(select(User).where(User.email == data.email))
-        if existing.scalar_one_or_none():
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Email already registered",
-            )
+        """Create an unverified user and email a link + 6-digit code."""
+        self._require_smtp()
+
+        email = data.email.strip().lower()
+        existing = await self._get_user_by_email(email)
+        if existing is not None:
+            if existing.email_verified or existing.google_sub:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Email already registered",
+                )
+            # Re-register: refresh verification for the same unverified row.
+            token, code = await self._issue_and_send_user_verification(existing)
+            _ = token, code
+            existing.hashed_password = get_password_hash(data.password)
+            await self.db.flush()
+            return existing
 
         user = User(
             id=uuid.uuid4(),
-            email=data.email,
+            email=email,
             hashed_password=get_password_hash(data.password),
+            email_verified=False,
         )
         self.db.add(user)
         await self.db.flush()
+        try:
+            await self._issue_and_send_user_verification(user)
+        except Exception:
+            await self.db.delete(user)
+            await self.db.flush()
+            raise
         return user
 
     async def authenticate(self, email: str, password: str) -> User:
-        result = await self.db.execute(select(User).where(User.email == email))
+        result = await self.db.execute(select(User).where(User.email == email.strip().lower()))
         user = result.scalar_one_or_none()
         if (
             not user
@@ -42,21 +65,31 @@ class AuthService:
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid email or password",
             )
+        if not user.email_verified:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Please verify your email before signing in. Check your inbox for the link or code.",
+            )
         return user
 
     async def upsert_google_user(self, *, email: str, google_sub: str) -> User:
+        email = email.strip().lower()
         by_sub = await self.db.execute(select(User).where(User.google_sub == google_sub))
         user = by_sub.scalar_one_or_none()
         if user:
             if user.email != email:
                 user.email = email
-                await self.db.flush()
+            user.email_verified = True
+            self._clear_verification_secrets(user)
+            await self.db.flush()
             return user
 
         by_email = await self.db.execute(select(User).where(User.email == email))
         user = by_email.scalar_one_or_none()
         if user:
             user.google_sub = google_sub
+            user.email_verified = True
+            self._clear_verification_secrets(user)
             await self.db.flush()
             return user
 
@@ -65,14 +98,149 @@ class AuthService:
             email=email,
             hashed_password=None,
             google_sub=google_sub,
+            email_verified=True,
         )
         self.db.add(user)
         await self.db.flush()
         return user
+
+    async def verify_email_token(self, token: str) -> User:
+        token = token.strip()
+        if not token:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Missing verification token",
+            )
+        user = await self._find_user_by_verify_token(token)
+        self._mark_verified(user)
+        await self.db.flush()
+        return user
+
+    async def verify_email_code(self, email: str, code: str) -> User:
+        email = email.strip().lower()
+        code = code.strip()
+        user = await self._get_user_by_email(email)
+        if not user or not user.email_verify_code_hash or not user.email_verify_expires_at:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid or expired verification code",
+            )
+        if user.email_verified:
+            return user
+        self._assert_code_valid(
+            code=code,
+            code_hash=user.email_verify_code_hash,
+            expires_at=user.email_verify_expires_at,
+        )
+        self._mark_verified(user)
+        await self.db.flush()
+        return user
+
+    async def resend_verification(self, email: str) -> None:
+        """Always succeeds outwardly to avoid email enumeration."""
+        self._require_smtp()
+        email = email.strip().lower()
+        user = await self._get_user_by_email(email)
+        if not user or user.email_verified or not user.hashed_password:
+            return
+        await self._issue_and_send_user_verification(user)
 
     async def get_user_by_id(self, user_id: uuid.UUID) -> User | None:
         result = await self.db.execute(select(User).where(User.id == user_id))
         return result.scalar_one_or_none()
 
     def create_token_for_user(self, user: User) -> str:
-        return create_access_token(str(user.id))
+        return create_access_token(str(user.id), email=user.email)
+
+    def build_verify_url(self, token: str) -> str:
+        base = self.settings.app_public_url.rstrip("/")
+        return f"{base}/api/v1/auth/verify-email?token={token}"
+
+    def _require_smtp(self) -> None:
+        if not smtp_configured(self.settings):
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=(
+                    "Email verification is not configured. Set SMTP_USERNAME and "
+                    "SMTP_PASSWORD (Gmail App Password) on the server."
+                ),
+            )
+
+    async def _get_user_by_email(self, email: str) -> User | None:
+        result = await self.db.execute(select(User).where(User.email == email))
+        return result.scalar_one_or_none()
+
+    async def _issue_and_send_user_verification(self, user: User) -> tuple[str, str]:
+        token = secrets.token_urlsafe(32)
+        code = f"{secrets.randbelow(1_000_000):06d}"
+        user.email_verify_token_hash = get_password_hash(token)
+        user.email_verify_code_hash = get_password_hash(code)
+        user.email_verify_expires_at = datetime.now(UTC) + timedelta(
+            minutes=self.settings.email_verification_expire_minutes
+        )
+        user.email_verified = False
+        await self.db.flush()
+        await send_verification_email(
+            to_email=user.email,
+            verify_url=self.build_verify_url(token),
+            code=code,
+            settings=self.settings,
+        )
+        return token, code
+
+    async def _find_user_by_verify_token(self, token: str) -> User:
+        result = await self.db.execute(
+            select(User).where(
+                User.email_verify_token_hash.is_not(None),
+                User.email_verified.is_(False),
+            )
+        )
+        candidates = list(result.scalars().all())
+        now = datetime.now(UTC)
+        for user in candidates:
+            if not user.email_verify_token_hash or not user.email_verify_expires_at:
+                continue
+            expires = user.email_verify_expires_at
+            if expires.tzinfo is None:
+                expires = expires.replace(tzinfo=UTC)
+            if expires < now:
+                continue
+            if verify_password(token, user.email_verify_token_hash):
+                return user
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired verification link",
+        )
+
+    def _assert_code_valid(
+        self,
+        *,
+        code: str,
+        code_hash: str,
+        expires_at: datetime,
+        invalid_detail: str = "Invalid or expired verification code",
+        expired_detail: str = "Verification code expired. Request a new one.",
+    ) -> None:
+        expires = expires_at
+        if expires.tzinfo is None:
+            expires = expires.replace(tzinfo=UTC)
+        if expires < datetime.now(UTC):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=expired_detail,
+            )
+        if not verify_password(code, code_hash):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=invalid_detail,
+            )
+
+    def _mark_verified(self, user: User) -> None:
+        user.email_verified = True
+        self._clear_verification_secrets(user)
+
+    @staticmethod
+    def _clear_verification_secrets(user: User) -> None:
+        user.email_verify_token_hash = None
+        user.email_verify_code_hash = None
+        user.email_verify_expires_at = None

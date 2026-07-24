@@ -155,6 +155,23 @@ export async function login(email: string, password: string): Promise<void> {
   setUserKey(email);
 }
 
+export async function verifyEmailCode(email: string, code: string): Promise<void> {
+  const data = await request<{ access_token: string }>("/api/v1/auth/verify-email", {
+    method: "POST",
+    body: JSON.stringify({ email, code }),
+  });
+  setToken(data.access_token);
+  setUserKey(email);
+}
+
+export async function resendVerification(email: string): Promise<string> {
+  const data = await request<{ detail: string }>("/api/v1/auth/resend-verification", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+  return data.detail;
+}
+
 export async function listChats(): Promise<ChatItem[]> {
   const data = await request<{ chats: ChatItem[] }>("/api/v1/chats", {}, true);
   return data.chats;
