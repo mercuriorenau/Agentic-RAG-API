@@ -19,10 +19,12 @@ import {
   ModelOption,
   QueryResponse,
   register,
+  resendVerification,
   setToken,
   setUserKey as persistUserKey,
   turnsFromMessages,
   uploadDocument,
+  verifyEmailCode,
 } from "./api";
 import { AgentPath } from "./components/AgentPath";
 import { BusyStatus, LiveBusyStep } from "./components/BusyStatus";
@@ -33,7 +35,6 @@ import { ProductTour, TourMode } from "./components/ProductTour";
 import { RetrievalTrace } from "./components/RetrievalTrace";
 import { ThinkingReplay } from "./components/ThinkingReplay";
 import { TypewriterText } from "./components/TypewriterText";
-import { TourLauncher } from "./components/TourLauncher";
 import { StackStrip } from "./components/StackStrip";
 import { AuthForm } from "./components/AuthForm";
 import {
@@ -50,8 +51,6 @@ import {
   RETRIEVAL_BUDGET,
 } from "./explainers";
 import {
-  clearCreateNudgeDone,
-  clearTourComplete,
   hasCompletedTour,
   hasDismissedCreateNudge,
   markCreateNudgeDone,
@@ -92,6 +91,8 @@ export default function App() {
   const [typingTurnId, setTypingTurnId] = useState<string | null>(null);
   const [openThinkingId, setOpenThinkingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [authInfo, setAuthInfo] = useState<string | null>(null);
+  const [pendingVerifyEmail, setPendingVerifyEmail] = useState<string | null>(null);
   const askCaughtUpRef = useRef<(() => void) | null>(null);
   const [userKey, setUserKey] = useState(getUserKey());
   const [tourMode, setTourMode] = useState<TourMode | null>(null);
@@ -100,7 +101,6 @@ export default function App() {
 
   const activeChat = chats.find((chat) => chat.id === activeChatId) ?? null;
   const showCreateChatControl = chats.length === 0;
-
   async function refreshChats(preferredId?: string | null) {
     const items = await listChats();
     setChats(items);
@@ -141,6 +141,7 @@ export default function App() {
     const token = params.get("auth_token");
     const email = params.get("auth_email");
     const authError = params.get("auth_error");
+    const emailVerified = params.get("email_verified");
     if (authError) {
       setError(authError);
       window.history.replaceState({}, "", window.location.pathname);
@@ -152,7 +153,15 @@ export default function App() {
         persistUserKey(email);
         setUserKey(email.toLowerCase());
       }
+      setPendingVerifyEmail(null);
       setAuthed(true);
+      window.history.replaceState({}, "", window.location.pathname);
+      return;
+    }
+    if (emailVerified === "1") {
+      setPendingVerifyEmail(null);
+      setAuthInfo("Email verified. You can sign in now.");
+      setError(null);
       window.history.replaceState({}, "", window.location.pathname);
     }
   }, []);
@@ -196,19 +205,66 @@ export default function App() {
 
   async function handleAuth(mode: "login" | "register", email: string, password: string) {
     setError(null);
+    setAuthInfo(null);
     beginBusy("auth");
+    const normalized = email.trim().toLowerCase();
     try {
       if (mode === "register") {
-        await register(email, password);
+        await register(normalized, password);
+        setPendingVerifyEmail(normalized);
+        setAuthInfo("Check your inbox for the verification link or 6-digit code.");
+        return;
       }
-      await login(email, password);
-      setUserKey(email.toLowerCase());
+      await login(normalized, password);
+      setUserKey(normalized);
       setAuthed(true);
+      setPendingVerifyEmail(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Authentication failed");
+      const message = err instanceof Error ? err.message : "Authentication failed";
+      if (mode === "login" && /verify your email/i.test(message)) {
+        setPendingVerifyEmail(normalized);
+      }
+      setError(message);
     } finally {
       endBusy();
     }
+  }
+
+  async function handleVerifyCode(email: string, code: string) {
+    setError(null);
+    setAuthInfo(null);
+    beginBusy("auth");
+    try {
+      await verifyEmailCode(email, code);
+      setUserKey(email.trim().toLowerCase());
+      setPendingVerifyEmail(null);
+      setAuthed(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Verification failed");
+    } finally {
+      endBusy();
+    }
+  }
+
+  async function handleResendVerification(email: string) {
+    setError(null);
+    beginBusy("auth");
+    try {
+      const detail = await resendVerification(email);
+      setAuthInfo(detail);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not resend verification");
+    } finally {
+      endBusy();
+    }
+  }
+
+
+
+  function handleBackToLogin() {
+    setPendingVerifyEmail(null);
+    setError(null);
+    setAuthInfo(null);
   }
 
   function handleLogout() {
@@ -282,7 +338,12 @@ export default function App() {
       await uploadDocument(activeChatId, file);
       setDocuments(await listDocuments(activeChatId));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload failed");
+      const message = err instanceof Error ? err.message : "Upload failed";
+      if (isRateLimitMessage(message)) {
+        setError(message);
+      } else {
+        setError(message);
+      }
     } finally {
       endBusy();
     }
@@ -402,7 +463,12 @@ export default function App() {
       const items = await listChats();
       setChats(items);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Query failed");
+      const message = err instanceof Error ? err.message : "Query failed";
+      if (isRateLimitMessage(message)) {
+        setError(message);
+      } else {
+        setError(message);
+      }
       endBusy();
       setAskHandoff(false);
       replaceAskSteps([]);
@@ -440,18 +506,6 @@ export default function App() {
     finishFirstVisitFlow();
   }
 
-  function handleStartTour() {
-    setTourMode("guide");
-  }
-
-  function handleSimulateFirstVisit() {
-    clearTourComplete(userKey);
-    clearCreateNudgeDone(userKey);
-    setShowCreateNudge(false);
-    setChatsFlipped(false);
-    setTourMode("invite");
-  }
-
   if (!authed) {
     return (
       <div className="shell auth-screen">
@@ -467,7 +521,16 @@ export default function App() {
               with citations you can verify.
             </p>
           </header>
-          <AuthForm busy={busy} error={error} onSubmit={handleAuth} />
+          <AuthForm
+            busy={busy}
+            error={error}
+            info={authInfo}
+            pendingVerifyEmail={pendingVerifyEmail}
+            onSubmit={handleAuth}
+            onVerifyCode={handleVerifyCode}
+            onResendVerification={handleResendVerification}
+            onBackToLogin={handleBackToLogin}
+          />
         </div>
         <StackStrip />
       </div>
@@ -481,9 +544,11 @@ export default function App() {
           <p className="brand">Agentic RAG</p>
           <p className="muted">Separate chats, each with its own documents</p>
         </div>
-        <button type="button" className="ghost" data-tour="sign-out" onClick={handleLogout}>
-          Sign out
-        </button>
+        <div className="topbar-actions">
+          <button type="button" className="ghost" data-tour="sign-out" onClick={handleLogout}>
+            Sign out
+          </button>
+        </div>
       </header>
 
       {error ? <div className="banner error">{error}</div> : null}
@@ -762,7 +827,12 @@ export default function App() {
             <button
               type="submit"
               data-tour="ask-button"
-              className={busyKind === "ask" ? "ask-submit is-busy" : "ask-submit"}
+              className={[
+                "ask-submit",
+                busyKind === "ask" ? "is-busy" : "",
+              ]
+                .filter(Boolean)
+                .join(" ")}
               disabled={busy || !question.trim() || !activeChatId}
             >
               {busyKind === "ask" ? (
@@ -849,10 +919,6 @@ export default function App() {
           </div>
         </section>
       </div>
-      <TourLauncher
-        onStart={handleStartTour}
-        onSimulateFirstVisit={handleSimulateFirstVisit}
-      />
       <ProductTour
         active={tourMode !== null}
         mode={tourMode || "invite"}
