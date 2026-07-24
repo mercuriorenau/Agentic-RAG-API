@@ -90,6 +90,11 @@ async def ask_question(
         messages = await chat_service.list_messages(current_user, chat_id)
         history = _history_from_messages(messages or [])
 
+    thinking_steps: list[dict] = []
+
+    async def on_progress(title: str, detail: str = "") -> None:
+        thinking_steps.append({"title": title, "detail": detail})
+
     try:
         response = await agent_service.answer_question(
             current_user,
@@ -98,6 +103,7 @@ async def ask_question(
             model_mode=body.model_mode,
             model_name=body.model_name,
             history=history,
+            on_progress=on_progress,
         )
     except Exception as exc:
         mapped = _provider_http_error(exc)
@@ -105,7 +111,13 @@ async def ask_question(
             raise mapped from exc
         raise
 
-    await chat_service.append_turn(current_user, chat_id, body.question, response)
+    await chat_service.append_turn(
+        current_user,
+        chat_id,
+        body.question,
+        response,
+        thinking_steps=thinking_steps,
+    )
     return response
 
 
@@ -133,8 +145,10 @@ async def ask_question_stream(
 
     async def event_gen():
         queue: asyncio.Queue[dict | None] = asyncio.Queue()
+        thinking_steps: list[dict] = []
 
         async def on_progress(title: str, detail: str = "") -> None:
+            thinking_steps.append({"title": title, "detail": detail})
             await queue.put({"type": "step", "title": title, "detail": detail})
 
         async def run_agent() -> None:
@@ -149,7 +163,11 @@ async def ask_question_stream(
                     on_progress=on_progress,
                 )
                 await chat_service.append_turn(
-                    current_user, chat_id, body.question, response
+                    current_user,
+                    chat_id,
+                    body.question,
+                    response,
+                    thinking_steps=thinking_steps,
                 )
                 await queue.put(
                     {

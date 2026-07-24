@@ -84,10 +84,25 @@ class ChatService:
         chat_id: uuid.UUID,
         question: str,
         response: QueryResponse,
+        thinking_steps: list[dict] | None = None,
     ) -> Chat | None:
         chat = await self.get_chat(user, chat_id)
         if chat is None:
             return None
+
+        metadata: dict = {
+            "citations": [citation.model_dump() for citation in response.citations],
+            "tools_used": response.tools_used,
+            "route": response.route,
+            "model_mode": response.model_mode,
+            "model_provider": response.model_provider,
+            "model_name": response.model_name,
+            "model_selection_explanation": response.model_selection_explanation,
+            "retrieval_trace": response.retrieval_trace,
+        }
+        normalized = _normalize_thinking_steps(thinking_steps)
+        if normalized:
+            metadata["thinking_steps"] = normalized
 
         self.db.add(
             Message(
@@ -103,16 +118,7 @@ class ChatService:
                 chat_id=chat.id,
                 role="assistant",
                 content=response.answer,
-                metadata_json={
-                    "citations": [citation.model_dump() for citation in response.citations],
-                    "tools_used": response.tools_used,
-                    "route": response.route,
-                    "model_mode": response.model_mode,
-                    "model_provider": response.model_provider,
-                    "model_name": response.model_name,
-                    "model_selection_explanation": response.model_selection_explanation,
-                    "retrieval_trace": response.retrieval_trace,
-                },
+                metadata_json=metadata,
             )
         )
         if chat.title in {"New chat", "Default chat"} and question.strip():
@@ -125,3 +131,19 @@ class ChatService:
         if chats:
             return chats[0]
         return await self.create_chat(user, title="New chat")
+
+
+def _normalize_thinking_steps(steps: list[dict] | None) -> list[dict] | None:
+    if not steps:
+        return None
+    out: list[dict] = []
+    for step in steps[:40]:
+        title = str(step.get("title") or "").strip()[:120]
+        if not title:
+            continue
+        detail = str(step.get("detail") or "").strip()[:240]
+        item: dict = {"title": title}
+        if detail:
+            item["detail"] = detail
+        out.append(item)
+    return out or None

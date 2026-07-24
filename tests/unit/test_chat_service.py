@@ -44,7 +44,16 @@ async def test_append_turn_renames_new_chat() -> None:
         chat.id,
         "Tell me about Santiago",
         response,
+        thinking_steps=[
+            {"title": "Planning", "detail": "openai / gpt-4o"},
+            {"title": "Skip uploads", "detail": "No document needed for this"},
+        ],
     )
     assert updated is not None
     assert updated.title == "Tell me about Santiago"
     assert db.add.call_count == 2
+    assistant_msg = db.add.call_args_list[1].args[0]
+    assert assistant_msg.metadata_json["thinking_steps"] == [
+        {"title": "Planning", "detail": "openai / gpt-4o"},
+        {"title": "Skip uploads", "detail": "No document needed for this"},
+    ]

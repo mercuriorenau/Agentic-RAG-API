@@ -187,8 +187,12 @@ export async function clearChatMessages(chatId: string): Promise<void> {
 
 export function turnsFromMessages(
   messages: ChatMessage[],
-): { question: string; response: QueryResponse }[] {
-  const turns: { question: string; response: QueryResponse }[] = [];
+): { question: string; response: QueryResponse; thinkingSteps?: { id: string; title: string; detail?: string }[] }[] {
+  const turns: {
+    question: string;
+    response: QueryResponse;
+    thinkingSteps?: { id: string; title: string; detail?: string }[];
+  }[] = [];
   let pending: string | null = null;
   for (const message of messages) {
     if (message.role === "user") {
@@ -196,7 +200,24 @@ export function turnsFromMessages(
       continue;
     }
     if (message.role === "assistant" && pending) {
-      const meta = (message.metadata || {}) as Partial<QueryResponse>;
+      const meta = (message.metadata || {}) as Partial<QueryResponse> & {
+        thinking_steps?: { title?: string; detail?: string }[];
+      };
+      const rawSteps = Array.isArray(meta.thinking_steps) ? meta.thinking_steps : [];
+      const thinkingSteps = rawSteps.flatMap((step, index) => {
+        const title = String(step?.title || "").trim();
+        if (!title) {
+          return [];
+        }
+        const detail = String(step?.detail || "").trim();
+        return [
+          {
+            id: `${message.id}-step-${index}`,
+            title,
+            ...(detail ? { detail } : {}),
+          },
+        ];
+      });
       turns.push({
         question: pending,
         response: {
@@ -210,6 +231,7 @@ export function turnsFromMessages(
           model_selection_explanation: meta.model_selection_explanation || "",
           retrieval_trace: meta.retrieval_trace || null,
         },
+        thinkingSteps: thinkingSteps.length > 0 ? thinkingSteps : undefined,
       });
       pending = null;
     }

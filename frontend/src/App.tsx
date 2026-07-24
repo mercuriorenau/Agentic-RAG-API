@@ -123,6 +123,7 @@ export default function App() {
       turnsFromMessages(messages).map((turn, index) => ({
         ...turn,
         id: `hist-${index}-${turn.question.slice(0, 24)}`,
+        thinkingSteps: turn.thinkingSteps,
       })),
     );
   }
