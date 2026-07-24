@@ -6,7 +6,7 @@ from fastapi.responses import RedirectResponse
 
 from app.api.deps import get_auth_service, get_current_user
 from app.core.config import get_settings
-from app.core.rate_limit import limiter
+from app.core.rate_limit import limiter, user_is_rate_limit_exempt
 from app.models import User
 from app.schemas.auth import (
     EmailOnlyRequest,
@@ -40,8 +40,18 @@ async def register(
         id=str(user.id),
         email=user.email,
         email_verified=False,
+        rate_limit_exempt=user_is_rate_limit_exempt(user.email),
     )
 
+
+@router.get("/me", response_model=UserResponse)
+async def me(current_user: User = Depends(get_current_user)) -> UserResponse:
+    return UserResponse(
+        id=str(current_user.id),
+        email=current_user.email,
+        email_verified=current_user.email_verified,
+        rate_limit_exempt=user_is_rate_limit_exempt(current_user.email),
+    )
 
 
 @router.post("/login", response_model=TokenResponse)

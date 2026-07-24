@@ -119,6 +119,9 @@ async function request<T>(
       const body = await response.json();
       if (typeof body.detail === "string") {
         detail = body.detail;
+      } else if (typeof body.error === "string") {
+        // SlowAPI RateLimitExceeded uses { "error": "Rate limit exceeded: …" }
+        detail = body.error;
       } else if (Array.isArray(body.detail)) {
         detail = body.detail
           .map((item: { msg?: string }) => item.msg || "error")
@@ -162,6 +165,19 @@ export async function verifyEmailCode(email: string, code: string): Promise<void
   });
   setToken(data.access_token);
   setUserKey(email);
+}
+
+export async function fetchMe(): Promise<{
+  id: string;
+  email: string;
+  email_verified: boolean;
+  rate_limit_exempt: boolean;
+}> {
+  return request(
+    "/api/v1/auth/me",
+    {},
+    true,
+  );
 }
 
 export async function resendVerification(email: string): Promise<string> {
@@ -422,6 +438,8 @@ export async function askQuestionStream(
       const data = await response.json();
       if (typeof data?.detail === "string") {
         detail = data.detail;
+      } else if (typeof data?.error === "string") {
+        detail = data.error;
       }
     } catch {
       /* ignore */

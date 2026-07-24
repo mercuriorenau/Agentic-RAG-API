@@ -7,8 +7,8 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
+from app.core.rate_limit import limiter, query_rate_limit_exempt
 from app.core.config import get_settings
-from app.core.rate_limit import limiter
 from app.db.session import get_db
 from app.models import User
 from app.schemas.query import ConversationTurn, QueryRequest, QueryResponse
@@ -70,7 +70,7 @@ def _provider_http_error(exc: Exception) -> HTTPException | None:
 
 
 @router.post("", response_model=QueryResponse)
-@limiter.limit(get_settings().rate_limit_query)
+@limiter.limit(get_settings().rate_limit_query, exempt_when=query_rate_limit_exempt)
 async def ask_question(
     request: Request,
     body: QueryRequest,
@@ -122,7 +122,7 @@ async def ask_question(
 
 
 @router.post("/stream")
-@limiter.limit(get_settings().rate_limit_query)
+@limiter.limit(get_settings().rate_limit_query, exempt_when=query_rate_limit_exempt)
 async def ask_question_stream(
     request: Request,
     body: QueryRequest,

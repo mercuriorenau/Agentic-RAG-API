@@ -33,7 +33,11 @@ class Settings(BaseSettings):
     agent_max_tool_rounds: int = 5
     conversation_history_max_turns: int = 6
     rate_limit_auth: str = "10/minute"
-    rate_limit_query: str = "3/day"
+    rate_limit_query: str = "10/day"
+    # When true, query rate limits are off for everyone (toggle in Railway while testing).
+    rate_limit_disabled: bool = False
+    # Comma-separated emails that skip query rate limits (your own accounts).
+    rate_limit_bypass_emails: str = ""
     max_query_length: int = DEFAULT_MAX_QUERY_LENGTH
     log_level: str = "INFO"
     max_upload_size_mb: int = 10

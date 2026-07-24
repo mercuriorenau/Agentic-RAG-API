@@ -8,6 +8,7 @@ import {
   deleteChat,
   deleteDocument,
   DocumentItem,
+  fetchMe,
   forgotPassword,
   getToken,
   getUserKey,
@@ -32,6 +33,14 @@ import { AgentPath } from "./components/AgentPath";
 import { BusyStatus, LiveBusyStep } from "./components/BusyStatus";
 import { Citations } from "./components/Citations";
 import { AnswerExplainerBlock, Explainer } from "./components/Explainer";
+import {
+  clearRateLimitLock,
+  engageRateLimitLock,
+  formatLockCountdown,
+  isRateLimitMessage,
+  rateLimitBannerMessage,
+  readLockUntil,
+} from "./rateLimitLock";
 import { DocumentPanel } from "./components/DocumentPanel";
 import { ProductTour, TourMode } from "./components/ProductTour";
 import { RetrievalTrace } from "./components/RetrievalTrace";
@@ -39,6 +48,7 @@ import { ThinkingReplay } from "./components/ThinkingReplay";
 import { TypewriterText } from "./components/TypewriterText";
 import { StackStrip } from "./components/StackStrip";
 import { AuthForm } from "./components/AuthForm";
+import { ProfileLinks } from "./components/ProfileLinks";
 import {
   CHAT_HISTORY,
   CHAT_SESSIONS,
@@ -95,6 +105,8 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [authInfo, setAuthInfo] = useState<string | null>(null);
   const [pendingVerifyEmail, setPendingVerifyEmail] = useState<string | null>(null);
+  const [rateLimitUntil, setRateLimitUntil] = useState<number | null>(() => readLockUntil());
+  const [lockNow, setLockNow] = useState(() => Date.now());
   const askCaughtUpRef = useRef<(() => void) | null>(null);
   const [userKey, setUserKey] = useState(getUserKey());
   const [tourMode, setTourMode] = useState<TourMode | null>(null);
@@ -103,6 +115,46 @@ export default function App() {
 
   const activeChat = chats.find((chat) => chat.id === activeChatId) ?? null;
   const showCreateChatControl = chats.length === 0;
+  const rateLimited = rateLimitUntil != null && rateLimitUntil > lockNow;
+  const rateLimitCountdown = rateLimited
+    ? formatLockCountdown(rateLimitUntil - lockNow)
+    : null;
+
+  function applyRateLimitLock(_message?: string) {
+    const until = engageRateLimitLock();
+    setRateLimitUntil(until);
+    setLockNow(Date.now());
+    setError(rateLimitBannerMessage(formatLockCountdown(until - Date.now())));
+  }
+
+  useEffect(() => {
+    if (!rateLimitUntil) {
+      return;
+    }
+    if (rateLimitUntil <= Date.now()) {
+      setRateLimitUntil(null);
+      return;
+    }
+    setLockNow(Date.now());
+    const id = window.setInterval(() => {
+      const now = Date.now();
+      setLockNow(now);
+      if (now >= rateLimitUntil) {
+        setRateLimitUntil(null);
+        setError((current) =>
+          current && isRateLimitMessage(current) ? null : current,
+        );
+      } else {
+        setError((current) =>
+          current && isRateLimitMessage(current)
+            ? rateLimitBannerMessage(formatLockCountdown(rateLimitUntil - now))
+            : current,
+        );
+      }
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [rateLimitUntil]);
+
   async function refreshChats(preferredId?: string | null) {
     const items = await listChats();
     setChats(items);
@@ -177,6 +229,20 @@ export default function App() {
       return;
     }
     refreshChats().catch((err: Error) => setError(err.message));
+    fetchMe()
+      .then((me) => {
+        if (!me.rate_limit_exempt) {
+          return;
+        }
+        clearRateLimitLock();
+        setRateLimitUntil(null);
+        setError((current) =>
+          current && isRateLimitMessage(current) ? null : current,
+        );
+      })
+      .catch(() => {
+        /* ignore — Ask still works; lock only clears for exempt owners */
+      });
   }, [authed]);
 
   useEffect(() => {
@@ -361,7 +427,7 @@ export default function App() {
   }
 
   async function handleUpload(file: File) {
-    if (!activeChatId) {
+    if (!activeChatId || rateLimited) {
       return;
     }
     setError(null);
@@ -372,7 +438,7 @@ export default function App() {
     } catch (err) {
       const message = err instanceof Error ? err.message : "Upload failed";
       if (isRateLimitMessage(message)) {
-        setError(message);
+        applyRateLimitLock(message);
       } else {
         setError(message);
       }
@@ -427,7 +493,7 @@ export default function App() {
   async function handleAsk(event: FormEvent) {
     event.preventDefault();
     const trimmed = question.trim();
-    if (!trimmed || !activeChatId) {
+    if (!trimmed || !activeChatId || rateLimited) {
       return;
     }
     const selected =
@@ -497,7 +563,7 @@ export default function App() {
     } catch (err) {
       const message = err instanceof Error ? err.message : "Query failed";
       if (isRateLimitMessage(message)) {
-        setError(message);
+        applyRateLimitLock(message);
       } else {
         setError(message);
       }
@@ -552,6 +618,7 @@ export default function App() {
               Upload files, then let an agent choose retrieval, web search, or a direct answer —
               with citations you can verify.
             </p>
+            <ProfileLinks />
           </header>
           <AuthForm
             busy={busy}
@@ -579,6 +646,7 @@ export default function App() {
           <p className="muted">Separate chats, each with its own documents</p>
         </div>
         <div className="topbar-actions">
+          <ProfileLinks />
           <button type="button" className="ghost" data-tour="sign-out" onClick={handleLogout}>
             Sign out
           </button>
@@ -709,6 +777,8 @@ export default function App() {
                       documents={documents}
                       busy={busy || !activeChatId}
                       uploading={busyKind === "upload"}
+                      rateLimited={rateLimited}
+                      lockCountdown={rateLimitCountdown}
                       onUpload={handleUpload}
                       onDelete={handleDelete}
                     />
@@ -856,7 +926,7 @@ export default function App() {
               onChange={(event) => setQuestion(event.target.value)}
               placeholder="What does the refund policy say?"
               rows={4}
-              disabled={busy || !activeChatId}
+              disabled={busy || !activeChatId || rateLimited}
             />
             <button
               type="submit"
@@ -864,12 +934,28 @@ export default function App() {
               className={[
                 "ask-submit",
                 busyKind === "ask" ? "is-busy" : "",
+                rateLimited ? "is-locked" : "",
               ]
                 .filter(Boolean)
                 .join(" ")}
-              disabled={busy || !question.trim() || !activeChatId}
+              disabled={busy || rateLimited || !question.trim() || !activeChatId}
+              title={
+                rateLimited
+                  ? `Query limit reached — unlocks in ${rateLimitCountdown}`
+                  : undefined
+              }
             >
-              {busyKind === "ask" ? (
+              {rateLimited ? (
+                <>
+                  <span className="lock-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="5" y="11" width="14" height="10" rx="2" />
+                      <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+                    </svg>
+                  </span>
+                  Locked · {rateLimitCountdown}
+                </>
+              ) : busyKind === "ask" ? (
                 <>
                   <span className="busy-spinner busy-spinner-inline" aria-hidden="true" />
                   {askHandoff ? "Done…" : "Thinking…"}
