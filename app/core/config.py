@@ -42,6 +42,13 @@ class Settings(BaseSettings):
     google_client_secret: str = ""
     google_redirect_uri: str = "http://localhost:8000/api/v1/auth/google/callback"
     app_public_url: str = "http://localhost:8000"
+    smtp_host: str = "smtp.gmail.com"
+    smtp_port: int = 587
+    smtp_username: str = ""
+    smtp_password: str = ""
+    smtp_from_email: str = ""
+    smtp_from_name: str = "Agentic RAG"
+    email_verification_expire_minutes: int = 10
 
     @property
     def max_upload_size_bytes(self) -> int:
