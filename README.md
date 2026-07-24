@@ -244,11 +244,16 @@ Self-RAG and rerank add small-model calls per retrieve, so latency and cost rise
 
 ## Railway deployment
 
-1. Create a Railway project and add a PostgreSQL database.
-2. Add this repo as a service (uses `railway.toml` + `Dockerfile`).
-3. Set environment variables: `DATABASE_URL`, `SECRET_KEY`, and your LLM key(s).
-4. Migrations run via `entrypoint.sh` on boot.
-5. Ensure pgvector is enabled (migration runs `CREATE EXTENSION IF NOT EXISTS vector`).
+1. Create a Railway project.
+2. Add **Postgres with pgvector** (not plain Postgres). Railway’s default Postgres image does **not** include the `vector` extension; without it boot fails on `alembic upgrade` / `CREATE EXTENSION vector`.
+3. Deploy this repo as a service (`railway.toml` + `Dockerfile`).
+4. Set variables on the app service:
+   - `DATABASE_URL` → reference the pgvector service’s `DATABASE_URL`
+   - `SECRET_KEY`, `OPENAI_API_KEY` (and optional Anthropic/Tavily/Google keys)
+   - `APP_PUBLIC_URL` → your public Railway domain
+   - Consider raising `RATE_LIMIT_QUERY` (default `3/day` is harsh for demos)
+5. **Settings → Networking → Generate Domain** (unexposed services have no public URL).
+6. Migrations run via `entrypoint.sh` on boot; the app listens on Railway’s `$PORT`.
 
 ## Tech stack
 
