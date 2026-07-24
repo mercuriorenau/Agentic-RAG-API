@@ -35,14 +35,16 @@ def test_build_google_authorize_url_contains_client() -> None:
 async def test_upsert_google_user_creates() -> None:
     db = AsyncMock()
     db.execute.side_effect = [
-        MagicMock(scalar_one_or_none=MagicMock(return_value=None)),
-        MagicMock(scalar_one_or_none=MagicMock(return_value=None)),
+        MagicMock(scalar_one_or_none=MagicMock(return_value=None)),  # pending
+        MagicMock(scalar_one_or_none=MagicMock(return_value=None)),  # by sub
+        MagicMock(scalar_one_or_none=MagicMock(return_value=None)),  # by email
     ]
     service = AuthService(db)
     user = await service.upsert_google_user(email="a@example.com", google_sub="sub-1")
     assert user.email == "a@example.com"
     assert user.google_sub == "sub-1"
     assert user.hashed_password is None
+    assert user.email_verified is True
     db.add.assert_called_once()
 
 
@@ -56,10 +58,12 @@ async def test_upsert_google_user_links_existing_email() -> None:
     )
     db = AsyncMock()
     db.execute.side_effect = [
-        MagicMock(scalar_one_or_none=MagicMock(return_value=None)),
-        MagicMock(scalar_one_or_none=MagicMock(return_value=existing)),
+        MagicMock(scalar_one_or_none=MagicMock(return_value=None)),  # pending
+        MagicMock(scalar_one_or_none=MagicMock(return_value=None)),  # by sub
+        MagicMock(scalar_one_or_none=MagicMock(return_value=existing)),  # by email
     ]
     service = AuthService(db)
     user = await service.upsert_google_user(email="a@example.com", google_sub="sub-2")
     assert user is existing
     assert user.google_sub == "sub-2"
+    assert user.email_verified is True

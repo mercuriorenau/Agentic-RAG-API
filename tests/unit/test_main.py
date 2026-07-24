@@ -46,6 +46,7 @@ async def test_register_endpoint(mock_register, app_with_mock_db) -> None:
     user = MagicMock()
     user.id = "11111111-1111-1111-1111-111111111111"
     user.email = "user@example.com"
+    user.email_verified = False
     mock_register.return_value = user
 
     transport = ASGITransport(app=app_with_mock_db)
@@ -56,3 +57,4 @@ async def test_register_endpoint(mock_register, app_with_mock_db) -> None:
         )
     assert response.status_code == 201
     assert response.json()["email"] == "user@example.com"
+    assert response.json()["email_verified"] is False

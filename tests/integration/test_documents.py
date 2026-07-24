@@ -3,18 +3,11 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from httpx import AsyncClient
 
+from tests.conftest import register_verify_and_login
+
 
 async def _register_and_login(client: AsyncClient, email: str = "docuser@example.com") -> str:
-    await client.post(
-        "/api/v1/auth/register",
-        json={"email": email, "password": "password123"},
-    )
-    login = await client.post(
-        "/api/v1/auth/login",
-        json={"email": email, "password": "password123"},
-    )
-    return login.json()["access_token"]
-
+    return await register_verify_and_login(client, email)
 
 async def _create_chat(client: AsyncClient, headers: dict[str, str]) -> str:
     response = await client.post("/api/v1/chats", headers=headers, json={"title": "Test chat"})

@@ -4,6 +4,7 @@ import pytest
 from httpx import AsyncClient
 
 from app.services.llm.base import ChatResult, ToolCall
+from tests.conftest import register_verify_and_login
 
 
 def _embedding(vector: list[float]):
@@ -11,15 +12,7 @@ def _embedding(vector: list[float]):
 
 
 async def _auth_and_chat(client: AsyncClient, email: str) -> tuple[dict[str, str], str]:
-    await client.post(
-        "/api/v1/auth/register",
-        json={"email": email, "password": "password123"},
-    )
-    login = await client.post(
-        "/api/v1/auth/login",
-        json={"email": email, "password": "password123"},
-    )
-    token = login.json()["access_token"]
+    token = await register_verify_and_login(client, email)
     headers = {"Authorization": f"Bearer {token}"}
     chat = await client.post("/api/v1/chats", headers=headers, json={"title": "RAG chat"})
     return headers, chat.json()["id"]
