@@ -20,7 +20,7 @@ ProgressCallback = Callable[[str, str], Awaitable[None]]
 _TOOL_STEP_TITLES = {
     "retrieve_documents": "Search uploads",
     "web_search": "Web search",
-    "answer_directly": "Answer directly",
+    "answer_directly": "Skip uploads",
 }
 
 SYSTEM_PROMPT = (
@@ -135,7 +135,6 @@ class AgentService:
                 await on_progress(title, detail)
 
         prior = _trim_history(history or [], self.settings.conversation_history_max_turns)
-        await emit("Inspect question", "Choosing a model for this ask")
         selection_text = _selection_text(question, prior)
         selection = select_model(
             selection_text,
@@ -143,21 +142,16 @@ class AgentService:
             requested_mode=model_mode,
             requested_model=model_name,
         )
-        await emit(
-            "Picked model",
-            f"{selection.provider} / {selection.model}",
-        )
         llm = self.llm or get_llm_provider(
             self.settings,
             provider_name=selection.provider,
             model_name=selection.model,
         )
         ready_docs = await _list_ready_documents(self.rag_service, user, chat_id)
-        if ready_docs:
-            await emit(
-                "Chat uploads ready",
-                ", ".join(ready_docs[:4]) + ("…" if len(ready_docs) > 4 else ""),
-            )
+        await emit(
+            "Planning",
+            f"{selection.provider} / {selection.model} — retrieve, web, or direct",
+        )
         messages: list[ChatMessage] = [
             ChatMessage(
                 role="system",
@@ -183,13 +177,8 @@ class AgentService:
         forced_retrieve_nudge = False
 
         for _ in range(self.settings.agent_max_tool_rounds):
-            if tools_used:
-                await emit(
-                    "Writing answer",
-                    "Grounding the reply in the passages already retrieved",
-                )
-            else:
-                await emit("Planning", "Choosing retrieve, web, or direct")
+            if tools_used and not all(name == "answer_directly" for name in tools_used):
+                await emit("Writing answer", _writing_progress_detail(tools_used))
             result = await llm.chat_with_tools(messages, TOOL_SPECS)
             if not result.tool_calls:
                 if (
@@ -268,10 +257,12 @@ class AgentService:
                 tool_detail = _tool_progress_detail(call.name, call.arguments)
                 await emit(tool_title, tool_detail)
                 tool_result = await execute_tool(call.name, call.arguments, context)
-                await emit(
-                    f"{tool_title} done",
-                    _tool_result_detail(call.name, tool_result),
-                )
+                # Direct answers are one beat — skip the noisy "… done" follow-up.
+                if call.name != "answer_directly":
+                    await emit(
+                        f"{tool_title} done",
+                        _tool_result_detail(call.name, tool_result),
+                    )
                 for citation in tool_result.citations:
                     key = _citation_key(citation)
                     if key not in seen_citation_keys:
@@ -318,9 +309,18 @@ def _tool_progress_detail(name: str, arguments: dict) -> str:
     if name == "web_search" and query:
         return f'query “{query[:120]}”'
     if name == "answer_directly":
-        reason = str(arguments.get("reason") or "").strip()
-        return reason[:160] if reason else "general knowledge"
+        return "No document needed for this"
     return ""
+
+
+def _writing_progress_detail(tools_used: list[str]) -> str:
+    if tools_used and all(name == "answer_directly" for name in tools_used):
+        return "Answering without uploads"
+    if "retrieve_documents" in tools_used:
+        return "Grounding the reply in the passages already retrieved"
+    if "web_search" in tools_used:
+        return "Summarizing web results"
+    return "Finalizing"
 
 
 def _tool_result_detail(name: str, tool_result) -> str:
