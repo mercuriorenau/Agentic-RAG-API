@@ -84,8 +84,9 @@ export const MODEL_PICKER =
   "retrieve documents, Tavily web search, or answer directly.";
 
 export const COST_GUARDRAIL =
-  "Demo limits: 600 characters per question and 3 asks per IP per day, plus the " +
-  "retrieval chunk cap above. That keeps public traffic from burning through API credits.";
+  "Personal demo limits: 600 characters per question and 10 asks per visitor per day, " +
+  "plus the retrieval chunk cap above. This is my portfolio Agentic RAG project — " +
+  "those caps keep API costs reasonable for visitors.";
 
 export const CONVERSATION_MEMORY =
   "Follow-ups use the last few Q&A turns, so pronouns like \"he\" or \"that resume\" " +

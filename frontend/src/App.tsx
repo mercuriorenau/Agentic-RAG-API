@@ -8,6 +8,7 @@ import {
   deleteChat,
   deleteDocument,
   DocumentItem,
+  forgotPassword,
   getToken,
   getUserKey,
   historyFromTurns,
@@ -20,6 +21,7 @@ import {
   QueryResponse,
   register,
   resendVerification,
+  resetPassword,
   setToken,
   setUserKey as persistUserKey,
   turnsFromMessages,
@@ -259,7 +261,37 @@ export default function App() {
     }
   }
 
+  async function handleForgotPassword(email: string) {
+    setError(null);
+    setAuthInfo(null);
+    beginBusy("auth");
+    try {
+      const detail = await forgotPassword(email);
+      setAuthInfo(detail);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Could not send reset code";
+      setError(message);
+      throw err instanceof Error ? err : new Error(message);
+    } finally {
+      endBusy();
+    }
+  }
 
+  async function handleResetPassword(email: string, code: string, newPassword: string) {
+    setError(null);
+    setAuthInfo(null);
+    beginBusy("auth");
+    try {
+      await resetPassword(email, code, newPassword);
+      setUserKey(email.trim().toLowerCase());
+      setPendingVerifyEmail(null);
+      setAuthed(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not reset password");
+    } finally {
+      endBusy();
+    }
+  }
 
   function handleBackToLogin() {
     setPendingVerifyEmail(null);
@@ -529,6 +561,8 @@ export default function App() {
             onSubmit={handleAuth}
             onVerifyCode={handleVerifyCode}
             onResendVerification={handleResendVerification}
+            onForgotPassword={handleForgotPassword}
+            onResetPassword={handleResetPassword}
             onBackToLogin={handleBackToLogin}
           />
         </div>
