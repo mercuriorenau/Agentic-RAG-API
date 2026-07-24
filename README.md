@@ -55,8 +55,13 @@ Deploy your own instance to Railway (see below) or run locally with Docker Compo
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | GET | `/health` | No | Health check |
-| POST | `/api/v1/auth/register` | No | Create account |
-| POST | `/api/v1/auth/login` | No | Get JWT |
+| POST | `/api/v1/auth/register` | No | Create account (sends verification email) |
+| POST | `/api/v1/auth/login` | No | Get JWT (requires verified email) |
+| POST | `/api/v1/auth/verify-email` | No | Verify with 6-digit code (returns JWT) |
+| GET | `/api/v1/auth/verify-email?token=` | No | Verify via email link (redirects signed in) |
+| POST | `/api/v1/auth/resend-verification` | No | Resend link + code |
+| POST | `/api/v1/auth/forgot-password` | No | Send password reset code (password unchanged until confirmed) |
+| POST | `/api/v1/auth/reset-password` | No | Confirm reset code + set new password (returns JWT) |
 | GET | `/api/v1/models` | No | List available model choices |
 | GET | `/api/v1/chats` | JWT | List chat sessions (creates one if empty) |
 | POST | `/api/v1/chats` | JWT | Create a chat session |
@@ -93,9 +98,11 @@ The query endpoint is rate limited and caps question length on purpose. These li
 git clone https://github.com/mercuriorenau/Agentic-RAG-API.git
 cd Agentic-RAG-API
 cp .env.example .env
-# Edit .env: set SECRET_KEY and at least one LLM API key
+# Edit .env: set SECRET_KEY, at least one LLM API key, and SMTP_* for signup
 docker compose up --build -d
 ```
+
+Email/password signup requires Gmail SMTP (App Password): set `SMTP_USERNAME`, `SMTP_PASSWORD`, and optionally `SMTP_FROM_EMAIL`. Users must verify via the emailed link or 6-digit code before login. Google sign-in is treated as verified. `APP_PUBLIC_URL` is used in verification links.
 
 The container runs migrations on start. Verify:
 
@@ -108,15 +115,20 @@ Open `http://localhost:8000` for the UI.
 ### Example usage
 
 ```bash
-# Register
+# Register (sends verification email — check inbox for link or code)
 curl -X POST http://localhost:8000/api/v1/auth/register \
   -H "Content-Type: application/json" \
   -d '{"email":"you@example.com","password":"password123"}'
 
-# Login
-TOKEN=$(curl -s -X POST http://localhost:8000/api/v1/auth/login \
+# Verify with code from the email (returns JWT and signs you in)
+TOKEN=$(curl -s -X POST http://localhost:8000/api/v1/auth/verify-email \
   -H "Content-Type: application/json" \
-  -d '{"email":"you@example.com","password":"password123"}' | jq -r .access_token)
+  -d '{"email":"you@example.com","code":"123456"}' | jq -r .access_token)
+
+# Or login later with the same email/password
+# TOKEN=$(curl -s -X POST http://localhost:8000/api/v1/auth/login \
+#   -H "Content-Type: application/json" \
+#   -d '{"email":"you@example.com","password":"password123"}' | jq -r .access_token)
 
 # Upload
 curl -X POST http://localhost:8000/api/v1/documents \
@@ -239,7 +251,14 @@ Self-RAG and rerank add small-model calls per retrieve, so latency and cost rise
 | `MAX_UPLOAD_SIZE_MB` | Upload size limit | `10` |
 | `STATIC_DIR` | Built frontend path | `./frontend/dist` |
 | `RATE_LIMIT_AUTH` | Auth rate limit | `10/minute` |
-| `RATE_LIMIT_QUERY` | Query rate limit | `3/day` |
+| `RATE_LIMIT_QUERY` | Query rate limit | `10/day` |
+| `RATE_LIMIT_DISABLED` | Turn off query limits for everyone | `false` |
+| `RATE_LIMIT_BYPASS_EMAILS` | Comma-separated owner emails (unlimited Ask) | |
+| `SMTP_USERNAME` | Gmail address for SMTP | _(required for email signup)_ |
+| `SMTP_PASSWORD` | Gmail App Password | _(required for email signup)_ |
+| `SMTP_FROM_EMAIL` | From address (defaults to username) | |
+| `EMAIL_VERIFICATION_EXPIRE_MINUTES` | Verify link/code lifetime | `10` |
+| `APP_PUBLIC_URL` | Public app URL (verify links + OAuth) | `http://localhost:8000` |
 | `LOG_LEVEL` | Log level | `INFO` |
 
 ## Railway deployment
@@ -250,8 +269,10 @@ Self-RAG and rerank add small-model calls per retrieve, so latency and cost rise
 4. Set variables on the app service:
    - `DATABASE_URL` → reference the pgvector service’s `DATABASE_URL`
    - `SECRET_KEY`, `OPENAI_API_KEY` (and optional Anthropic/Tavily/Google keys)
-   - `APP_PUBLIC_URL` → your public Railway domain
-   - Consider raising `RATE_LIMIT_QUERY` (default `3/day` is harsh for demos)
+   - `SMTP_USERNAME`, `SMTP_PASSWORD` (Gmail App Password) and optional `SMTP_FROM_EMAIL` for email/password signup
+   - `APP_PUBLIC_URL` → your public Railway domain (used in verification links + OAuth)
+   - Prefer `RATE_LIMIT_QUERY=10/day` for public demos (keeps LLM spend bounded)
+   - To use the live app yourself without the visitor cap: set `RATE_LIMIT_BYPASS_EMAILS` to your login emails, or temporarily set `RATE_LIMIT_DISABLED=true`
 5. **Settings → Networking → Generate Domain** (unexposed services have no public URL).
 6. Migrations run via `entrypoint.sh` on boot; the app listens on Railway’s `$PORT`.
 
