@@ -139,11 +139,11 @@ TOKEN=$(curl -s -X POST http://localhost:8000/api/v1/auth/verify-email \
 CHAT_ID=$(curl -s http://localhost:8000/api/v1/chats \
   -H "Authorization: Bearer $TOKEN" | jq -r '.chats[0].id')
 
-# Upload into that chat
+# Upload one of your own documents into that chat
 curl -X POST http://localhost:8000/api/v1/documents \
   -H "Authorization: Bearer $TOKEN" \
   -F "chat_id=$CHAT_ID" \
-  -F "file=@./sample.txt"
+  -F "file=@./path/to/document.pdf"
 
 # Ask in the same chat
 curl -X POST http://localhost:8000/api/v1/queries \
