@@ -31,6 +31,17 @@ body,
   min-height: 100%;
 }
 
+body:has(.auth-screen) {
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+body:has(.auth-screen) #root {
+  height: 100%;
+  overflow: hidden;
+}
+
 body {
   margin: 0;
   color: var(--ink);
@@ -396,17 +407,20 @@ button.danger {
 }
 
 .auth-screen {
-  min-height: 100vh;
-  min-height: 100dvh;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+  max-height: 100vh;
+  max-height: 100dvh;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 1.5rem;
-  padding: 2rem 0 2rem;
+  gap: 0.85rem;
+  padding: 0.85rem 0 0.65rem;
   width: min(1120px, calc(100% - 2rem));
   max-width: 100%;
-  overflow-x: clip;
+  overflow: hidden;
 }
 
 .auth-screen-inner {
@@ -414,8 +428,18 @@ button.danger {
   max-width: 100%;
   min-width: 0;
   display: grid;
-  gap: 1.25rem;
+  gap: 0.85rem;
   justify-items: stretch;
+  flex: 0 1 auto;
+  min-height: 0;
+}
+
+.auth-screen .stack-strip {
+  flex-shrink: 0;
+}
+
+.auth-screen .stack-strip-note {
+  display: none;
 }
 
 .stack-strip {
@@ -527,11 +551,11 @@ button.danger {
 .auth-hero .label-with-note {
   justify-content: center;
   align-items: center;
-  margin-bottom: 0.55rem;
+  margin-bottom: 0.35rem;
 }
 
 .auth-hero .brand {
-  font-size: 1.15rem;
+  font-size: 1.05rem;
   letter-spacing: 0.06em;
   margin: 0;
   line-height: 1;
@@ -545,15 +569,19 @@ button.danger {
 }
 
 .auth-hero .tech-note-trigger {
-  --tech-note-size: 1.15rem;
+  --tech-note-size: 1.05rem;
 }
 
 .auth-hero h1 {
-  font-size: clamp(1.6rem, 4vw, 2.1rem);
+  font-size: clamp(1.35rem, 3.4vw, 1.85rem);
+  margin-bottom: 0.45rem;
 }
 
 .auth-hero .lede {
-  margin-inline: auto;
+  margin: 0 auto;
+  font-size: 0.92rem;
+  line-height: 1.4;
+  max-width: 34rem;
 }
 
 .profile-links {
@@ -591,7 +619,48 @@ button.danger {
 
 .auth-hero .profile-links {
   justify-content: center;
-  margin-top: 1rem;
+  margin-top: 0.55rem;
+}
+
+@media (max-height: 860px) {
+  .auth-screen {
+    gap: 0.55rem;
+    padding: 0.55rem 0 0.4rem;
+  }
+
+  .auth-screen-inner {
+    gap: 0.55rem;
+  }
+
+  .auth-hero .lede {
+    display: none;
+  }
+
+  .auth-hero .profile-links {
+    margin-top: 0.35rem;
+  }
+
+  .auth-hero h1 {
+    font-size: clamp(1.25rem, 3vw, 1.6rem);
+  }
+
+  .auth-panel {
+    padding: 1rem;
+  }
+
+  .stack-strip-label {
+    margin-bottom: 0.4rem;
+  }
+}
+
+@media (max-height: 720px) {
+  .auth-hero .profile-links {
+    display: none;
+  }
+
+  .auth-screen .stack-strip {
+    display: none;
+  }
 }
 
 .auth-banner {

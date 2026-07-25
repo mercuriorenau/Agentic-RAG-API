@@ -93,6 +93,16 @@ def test_send_smtp_logs_in_and_sends() -> None:
             html_body="<p>html</p>",
         )
     smtp_cls.assert_called_once_with(settings.smtp_host, settings.smtp_port, timeout=30)
+    assert smtp.ehlo.call_count == 2
     smtp.starttls.assert_called_once()
     smtp.login.assert_called_once_with(settings.smtp_username, settings.smtp_password)
     smtp.sendmail.assert_called_once()
+
+
+def test_settings_strips_spaces_from_gmail_app_password() -> None:
+    settings = Settings(
+        smtp_username="user@gmail.com",
+        smtp_password="abcd efgh ijkl mnop",
+        smtp_from_email="user@gmail.com",
+    )
+    assert settings.smtp_password == "abcdefghijklmnop"

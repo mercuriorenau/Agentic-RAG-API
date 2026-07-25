@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 DEFAULT_MAX_QUERY_LENGTH = 600
@@ -53,6 +54,21 @@ class Settings(BaseSettings):
     smtp_from_email: str = ""
     smtp_from_name: str = "Agentic RAG"
     email_verification_expire_minutes: int = 10
+
+    @field_validator("smtp_password", mode="before")
+    @classmethod
+    def normalize_smtp_password(cls, value: object) -> object:
+        # Gmail App Passwords are often copied as "xxxx xxxx xxxx xxxx".
+        if isinstance(value, str):
+            return value.replace(" ", "").strip()
+        return value
+
+    @field_validator("smtp_username", "smtp_from_email", mode="before")
+    @classmethod
+    def strip_smtp_identity(cls, value: object) -> object:
+        if isinstance(value, str):
+            return value.strip()
+        return value
 
     @property
     def max_upload_size_bytes(self) -> int:

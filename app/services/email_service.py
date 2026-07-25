@@ -57,7 +57,9 @@ def _send_smtp(
     message.attach(MIMEText(html_body, "html", "utf-8"))
 
     with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=30) as server:
+        server.ehlo()
         server.starttls()
+        server.ehlo()
         server.login(settings.smtp_username, settings.smtp_password)
         server.sendmail(from_address, [to_email], message.as_string())
 

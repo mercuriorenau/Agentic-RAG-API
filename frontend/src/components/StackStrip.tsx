@@ -12,7 +12,7 @@ const STACK_ITEMS = [
   { name: "TypeScript", icon: "language" },
   { name: "Vite", icon: "build" },
   { name: "Google Auth", icon: "auth" },
-  { name: "Gmail SMTP", icon: "auth" },
+  { name: "Gmail SMTP", icon: "mail" },
   { name: "SlowAPI", icon: "api" },
   { name: "Docker", icon: "container" },
 ] as const;
@@ -139,6 +139,13 @@ function SemanticIcon({ kind }: { kind: IconKind }) {
           <rect x="6" y="11" width="12" height="9" rx="1.5" />
           <path d="M9 11V8a3 3 0 0 1 6 0v3" />
           <circle cx="12" cy="15.5" r="1.2" />
+        </svg>
+      );
+    case "mail":
+      return (
+        <svg {...props}>
+          <rect x="3.5" y="6" width="17" height="12" rx="1.5" />
+          <path d="M4.5 7.5 12 13l7.5-5.5" />
         </svg>
       );
     case "container":
