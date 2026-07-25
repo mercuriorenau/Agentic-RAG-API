@@ -41,6 +41,7 @@ async def register(
         email=user.email,
         email_verified=False,
         rate_limit_exempt=user_is_rate_limit_exempt(user.email),
+        onboarded=False,
     )
 
 
@@ -51,6 +52,22 @@ async def me(current_user: User = Depends(get_current_user)) -> UserResponse:
         email=current_user.email,
         email_verified=current_user.email_verified,
         rate_limit_exempt=user_is_rate_limit_exempt(current_user.email),
+        onboarded=current_user.onboarded,
+    )
+
+
+@router.post("/onboarded", response_model=UserResponse)
+async def complete_onboarding(
+    current_user: User = Depends(get_current_user),
+    auth_service: AuthService = Depends(get_auth_service),
+) -> UserResponse:
+    user = await auth_service.mark_onboarded(current_user)
+    return UserResponse(
+        id=str(user.id),
+        email=user.email,
+        email_verified=user.email_verified,
+        rate_limit_exempt=user_is_rate_limit_exempt(user.email),
+        onboarded=user.onboarded,
     )
 
 

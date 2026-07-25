@@ -40,5 +40,6 @@ class UserResponse(BaseModel):
     email: str
     email_verified: bool = False
     rate_limit_exempt: bool = False
+    onboarded: bool = False
 
     model_config = {"from_attributes": True}

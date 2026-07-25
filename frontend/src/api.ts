@@ -167,17 +167,21 @@ export async function verifyEmailCode(email: string, code: string): Promise<void
   setUserKey(email);
 }
 
-export async function fetchMe(): Promise<{
+export interface MeResponse {
   id: string;
   email: string;
   email_verified: boolean;
   rate_limit_exempt: boolean;
-}> {
-  return request(
-    "/api/v1/auth/me",
-    {},
-    true,
-  );
+  onboarded: boolean;
+}
+
+export async function fetchMe(): Promise<MeResponse> {
+  return request("/api/v1/auth/me", {}, true);
+}
+
+/** Persist that this account has finished the first-visit walkthrough. */
+export async function markOnboarded(): Promise<MeResponse> {
+  return request("/api/v1/auth/onboarded", { method: "POST" }, true);
 }
 
 export async function resendVerification(email: string): Promise<string> {

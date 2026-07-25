@@ -262,6 +262,13 @@ class AuthService:
         result = await self.db.execute(select(User).where(User.id == user_id))
         return result.scalar_one_or_none()
 
+    async def mark_onboarded(self, user: User) -> User:
+        """Persist that this account has seen the first-visit walkthrough."""
+        if not user.onboarded:
+            user.onboarded = True
+            await self.db.flush()
+        return user
+
     def create_token_for_user(self, user: User) -> str:
         return create_access_token(str(user.id), email=user.email)
 

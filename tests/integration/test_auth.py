@@ -121,3 +121,21 @@ async def test_forgot_password_requires_code_before_change(client: AsyncClient) 
 async def test_protected_route_requires_auth(client: AsyncClient) -> None:
     response = await client.get("/api/v1/documents")
     assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_onboarded_flag_persists_per_account(client: AsyncClient) -> None:
+    token = await register_verify_and_login(client, "tour@example.com")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    me = await client.get("/api/v1/auth/me", headers=headers)
+    assert me.status_code == 200
+    assert me.json()["onboarded"] is False
+
+    done = await client.post("/api/v1/auth/onboarded", headers=headers)
+    assert done.status_code == 200
+    assert done.json()["onboarded"] is True
+
+    # A brand-new session (e.g. incognito) reads the same server flag.
+    me_again = await client.get("/api/v1/auth/me", headers=headers)
+    assert me_again.json()["onboarded"] is True

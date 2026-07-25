@@ -18,6 +18,7 @@ import {
   listDocuments,
   listModels,
   login,
+  markOnboarded,
   ModelOption,
   QueryResponse,
   register,
@@ -114,6 +115,8 @@ export default function App() {
   const [lockNow, setLockNow] = useState(() => Date.now());
   const askCaughtUpRef = useRef<(() => void) | null>(null);
   const [userKey, setUserKey] = useState(getUserKey());
+  // Server-side "seen the tour" flag. null = still loading /me.
+  const [serverOnboarded, setServerOnboarded] = useState<boolean | null>(null);
   const [tourMode, setTourMode] = useState<TourMode | null>(null);
   const [chatsFlipped, setChatsFlipped] = useState(false);
   const [showCreateNudge, setShowCreateNudge] = useState(false);
@@ -248,11 +251,18 @@ export default function App() {
 
   useEffect(() => {
     if (!authed) {
+      setServerOnboarded(null);
       return;
     }
     refreshChats().catch((err: Error) => setError(err.message));
     fetchMe()
       .then((me) => {
+        // Server is the source of truth for the tour so it survives new
+        // browsers/incognito, where localStorage starts empty.
+        setServerOnboarded(me.onboarded);
+        if (me.onboarded) {
+          markTourComplete(userKey);
+        }
         if (!me.rate_limit_exempt) {
           return;
         }
@@ -274,11 +284,15 @@ export default function App() {
   }, [userKey]);
 
   useEffect(() => {
-    if (!authed || !userKey || hasCompletedTour(userKey)) {
+    // Only show the tour once /me confirms this account has not seen it.
+    if (!authed || !userKey || serverOnboarded !== false) {
+      return;
+    }
+    if (hasCompletedTour(userKey)) {
       return;
     }
     setTourMode("invite");
-  }, [authed, userKey]);
+  }, [authed, userKey, serverOnboarded]);
 
   useEffect(() => {
     if (!authed || !activeChatId) {
@@ -626,6 +640,11 @@ export default function App() {
 
   function finishFirstVisitFlow() {
     markTourComplete(userKey);
+    setServerOnboarded(true);
+    // Persist per account so a new browser/incognito won't replay the tour.
+    void markOnboarded().catch(() => {
+      /* local flag already set; server retries on next tour completion */
+    });
     setTourMode(null);
     // After the invite/tour (not during it), nudge first-time users to create a chat.
     if (!hasDismissedCreateNudge(userKey)) {
@@ -1096,6 +1115,9 @@ export default function App() {
           </div>
         </section>
       </div>
+      <footer className="workspace-footer muted">
+        Personal demo. By using it you accept the <LegalNotice /> notice.
+      </footer>
       <ProductTour
         active={tourMode !== null}
         mode={tourMode || "invite"}
