@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from httpx import ASGITransport, AsyncClient
 
+from app.core.rate_limit import limiter
 from app.db.session import get_db
 from app.main import create_app
 
@@ -13,10 +14,14 @@ def app_with_mock_db():
     async def override_get_db() -> AsyncGenerator[AsyncMock, None]:
         yield AsyncMock()
 
+    was_enabled = limiter.enabled
+    limiter.enabled = False
     app = create_app()
+    app.state.limiter = limiter
     app.dependency_overrides[get_db] = override_get_db
     yield app
     app.dependency_overrides.clear()
+    limiter.enabled = was_enabled
 
 
 @pytest.mark.asyncio

@@ -1,7 +1,8 @@
 import pytest
 from httpx import AsyncClient
 
-from tests.conftest import register_verify_and_login, verification_outbox
+from tests.auth_helpers import register_verify_and_login
+from tests.email_outbox import verification_outbox
 
 
 @pytest.mark.asyncio

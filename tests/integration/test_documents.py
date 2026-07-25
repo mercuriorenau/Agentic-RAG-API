@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from httpx import AsyncClient
 
-from tests.conftest import register_verify_and_login
+from tests.auth_helpers import register_verify_and_login
 
 
 async def _register_and_login(client: AsyncClient, email: str = "docuser@example.com") -> str:

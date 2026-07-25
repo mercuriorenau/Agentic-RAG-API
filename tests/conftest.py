@@ -1,6 +1,5 @@
 import os
 from collections.abc import AsyncGenerator
-from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 import pytest
@@ -9,17 +8,16 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.core.config import get_settings
+from app.core.rate_limit import limiter
 from app.db.session import get_db
 from app.main import create_app
 from app.models import Base
+from tests.email_outbox import verification_outbox
 
 TEST_DATABASE_URL = os.getenv(
     "TEST_DATABASE_URL",
     "postgresql+asyncpg://postgres:postgres@localhost:5432/ragdb_test",
 )
-
-# Last verification payload captured by the SMTP mock (per client fixture).
-verification_outbox: dict[str, Any] = {}
 
 
 @pytest.fixture(scope="session")
@@ -38,6 +36,8 @@ def test_settings(tmp_path, monkeypatch):
     monkeypatch.setenv("SMTP_PASSWORD", "test-app-password")
     monkeypatch.setenv("SMTP_FROM_EMAIL", "smtp@test.local")
     monkeypatch.setenv("APP_PUBLIC_URL", "http://test")
+    monkeypatch.setenv("RATE_LIMIT_AUTH", "1000/minute")
+    monkeypatch.setenv("RATE_LIMIT_QUERY", "1000/minute")
     get_settings.cache_clear()
     return get_settings()
 
@@ -74,6 +74,7 @@ async def db_session(db_engine) -> AsyncGenerator[AsyncSession, None]:
 @pytest_asyncio.fixture
 async def client(db_engine, test_settings, monkeypatch) -> AsyncGenerator[AsyncClient, None]:
     verification_outbox.clear()
+    limiter.enabled = False
 
     async def fake_send_verification_email(
         *,
@@ -130,7 +131,7 @@ async def client(db_engine, test_settings, monkeypatch) -> AsyncGenerator[AsyncC
                 raise
 
     app = create_app()
-
+    app.state.limiter = limiter
     app.dependency_overrides[get_db] = override_get_db
 
     transport = ASGITransport(app=app)
@@ -138,28 +139,6 @@ async def client(db_engine, test_settings, monkeypatch) -> AsyncGenerator[AsyncC
         yield ac
 
     app.dependency_overrides.clear()
+    limiter.enabled = True
     get_settings.cache_clear()
     verification_outbox.clear()
-
-
-async def register_verify_and_login(
-    client: AsyncClient,
-    email: str,
-    password: str = "password123",
-) -> str:
-    register_response = await client.post(
-        "/api/v1/auth/register",
-        json={"email": email, "password": password},
-    )
-    assert register_response.status_code == 201, register_response.text
-    assert register_response.json()["email_verified"] is False
-    assert verification_outbox.get("code")
-
-    verify_response = await client.post(
-        "/api/v1/auth/verify-email",
-        json={"email": email, "code": verification_outbox["code"]},
-    )
-    assert verify_response.status_code == 200, verify_response.text
-    token = verify_response.json().get("access_token")
-    assert token
-    return token

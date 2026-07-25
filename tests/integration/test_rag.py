@@ -4,7 +4,7 @@ import pytest
 from httpx import AsyncClient
 
 from app.services.llm.base import ChatResult, ToolCall
-from tests.conftest import register_verify_and_login
+from tests.auth_helpers import register_verify_and_login
 
 
 def _embedding(vector: list[float]):
