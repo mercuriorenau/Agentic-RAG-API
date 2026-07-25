@@ -1,7 +1,7 @@
 import uuid
 from pathlib import Path
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings, get_settings
@@ -23,6 +23,11 @@ ALLOWED_CONTENT_TYPES = {
     "text/plain",
     "text/markdown",
 }
+_DEFAULT_CHAT_TITLES = frozenset({"New chat", "Default chat"})
+
+
+def _title_stem(filename: str) -> str:
+    return Path(filename).stem.strip()[:200]
 
 
 class DocumentService:
@@ -44,6 +49,17 @@ class DocumentService:
         )
         return result.scalar_one_or_none()
 
+    async def _rename_default_chat(self, chat: Chat, filename: str) -> None:
+        stem = _title_stem(filename)
+        if not stem or chat.title not in _DEFAULT_CHAT_TITLES:
+            return
+        await self.db.execute(
+            update(Chat)
+            .where(Chat.id == chat.id, Chat.title.in_(_DEFAULT_CHAT_TITLES))
+            .values(title=stem)
+        )
+        chat.title = stem
+
     async def list_documents(self, user: User, chat_id: uuid.UUID) -> list[Document] | None:
         chat = await self._get_owned_chat(user, chat_id)
         if chat is None:
@@ -53,7 +69,12 @@ class DocumentService:
             .where(Document.user_id == user.id, Document.chat_id == chat_id)
             .order_by(Document.created_at.desc())
         )
-        return list(result.scalars().all())
+        documents = list(result.scalars().all())
+        # Repair chats that still say "New chat" after an earlier upload.
+        if documents and chat.title in _DEFAULT_CHAT_TITLES:
+            oldest = min(documents, key=lambda doc: doc.created_at)
+            await self._rename_default_chat(chat, oldest.filename)
+        return documents
 
     async def get_document(self, user: User, document_id: uuid.UUID) -> Document | None:
         result = await self.db.execute(
@@ -117,9 +138,7 @@ class DocumentService:
                 )
 
             document.status = "ready"
-            stem = Path(filename).stem.strip()
-            if chat.title in {"New chat", "Default chat"} and stem:
-                chat.title = stem[:200]
+            await self._rename_default_chat(chat, filename)
             logger.info(
                 "document_ingested",
                 document_id=str(document.id),
