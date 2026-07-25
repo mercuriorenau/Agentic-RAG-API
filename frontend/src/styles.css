@@ -1339,6 +1339,26 @@ button.linkish.danger:hover:not(:disabled) {
   margin-bottom: 1.25rem;
 }
 
+.ask-submit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  position: relative;
+}
+
+.ask-enter-hint {
+  position: absolute;
+  right: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  line-height: 0;
+  opacity: 0.85;
+  pointer-events: none;
+}
+
 .preview-overlay {
   position: fixed;
   inset: 0;

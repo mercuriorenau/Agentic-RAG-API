@@ -1000,6 +1000,17 @@ export default function App() {
               data-tour="question"
               value={question}
               onChange={(event) => setQuestion(event.target.value)}
+              onKeyDown={(event) => {
+                // Enter sends; Shift+Enter inserts a newline (Cursor-style).
+                if (event.key !== "Enter" || event.shiftKey) {
+                  return;
+                }
+                event.preventDefault();
+                if (busy || rateLimited || !question.trim() || !activeChatId) {
+                  return;
+                }
+                event.currentTarget.form?.requestSubmit();
+              }}
               placeholder="What does the refund policy say?"
               rows={4}
               disabled={busy || !activeChatId || rateLimited}
@@ -1018,7 +1029,7 @@ export default function App() {
               title={
                 rateLimited
                   ? `Query limit reached. Unlocks in ${rateLimitCountdown}`
-                  : undefined
+                  : "Ask · Enter to send, Shift+Enter for a new line"
               }
             >
               {rateLimited ? (
@@ -1037,7 +1048,15 @@ export default function App() {
                   {askHandoff ? "Done…" : "Running agent…"}
                 </>
               ) : (
-                "Ask"
+                <>
+                  Ask
+                  <span className="ask-enter-hint" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M19 7v6a2 2 0 0 1-2 2H7" />
+                      <path d="m11 11-4 4 4 4" />
+                    </svg>
+                  </span>
+                </>
               )}
             </button>
           </form>
