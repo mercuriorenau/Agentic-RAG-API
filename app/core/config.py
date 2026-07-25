@@ -47,6 +47,8 @@ class Settings(BaseSettings):
     google_client_secret: str = ""
     google_redirect_uri: str = "http://localhost:8000/api/v1/auth/google/callback"
     app_public_url: str = "http://localhost:8000"
+    # Prefer Brevo HTTPS API on Railway Hobby (outbound SMTP is blocked there).
+    brevo_api_key: str = ""
     smtp_host: str = "smtp.gmail.com"
     smtp_port: int = 587
     smtp_username: str = ""

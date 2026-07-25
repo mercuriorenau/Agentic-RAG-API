@@ -1,4 +1,4 @@
-"""Outbound email via Gmail SMTP (App Password)."""
+"""Outbound email via Brevo HTTPS API (preferred) or Gmail SMTP fallback."""
 
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.utils import formataddr, formatdate, make_msgid
 
+import httpx
 from fastapi import HTTPException, status
 
 from app.core.config import Settings, get_settings
@@ -16,10 +17,22 @@ from app.core.logging import get_logger
 
 logger = get_logger(__name__)
 
+BREVO_SEND_URL = "https://api.brevo.com/v3/smtp/email"
+
 
 def smtp_configured(settings: Settings | None = None) -> bool:
     settings = settings or get_settings()
     return bool(settings.smtp_username and settings.smtp_password)
+
+
+def brevo_configured(settings: Settings | None = None) -> bool:
+    settings = settings or get_settings()
+    return bool(settings.brevo_api_key.strip() and _from_address(settings))
+
+
+def email_configured(settings: Settings | None = None) -> bool:
+    settings = settings or get_settings()
+    return brevo_configured(settings) or smtp_configured(settings)
 
 
 def _from_address(settings: Settings) -> str:
@@ -64,6 +77,42 @@ def _send_smtp(
         server.sendmail(from_address, [to_email], message.as_string())
 
 
+async def _send_brevo(
+    *,
+    settings: Settings,
+    to_email: str,
+    subject: str,
+    text_body: str,
+    html_body: str,
+) -> None:
+    from_address = _from_address(settings)
+    payload = {
+        "sender": {
+            "name": settings.smtp_from_name.strip() or "Agentic RAG",
+            "email": from_address,
+        },
+        "to": [{"email": to_email}],
+        "subject": subject,
+        "htmlContent": html_body,
+        "textContent": text_body,
+    }
+    headers = {
+        "accept": "application/json",
+        "content-type": "application/json",
+        "api-key": settings.brevo_api_key.strip(),
+    }
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        response = await client.post(BREVO_SEND_URL, headers=headers, json=payload)
+    if response.status_code >= 400:
+        detail = response.text[:300]
+        logger.error(
+            "brevo_send_failed",
+            status_code=response.status_code,
+            detail=detail,
+        )
+        raise RuntimeError(f"Brevo API {response.status_code}: {detail}")
+
+
 async def _send_templated(
     *,
     to_email: str,
@@ -72,15 +121,25 @@ async def _send_templated(
     html_body: str,
     settings: Settings,
 ) -> None:
-    if not smtp_configured(settings):
+    if not email_configured(settings):
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=(
-                "Email verification is not configured. Set SMTP_USERNAME and "
-                "SMTP_PASSWORD (Gmail App Password) on the server."
+                "Email verification is not configured. Set BREVO_API_KEY and "
+                "SMTP_FROM_EMAIL (recommended on Railway), or SMTP_USERNAME and "
+                "SMTP_PASSWORD for local Gmail SMTP."
             ),
         )
     try:
+        if brevo_configured(settings):
+            await _send_brevo(
+                settings=settings,
+                to_email=to_email,
+                subject=subject,
+                text_body=text_body,
+                html_body=html_body,
+            )
+            return
         await asyncio.to_thread(
             _send_smtp,
             settings=settings,
@@ -89,11 +148,13 @@ async def _send_templated(
             text_body=text_body,
             html_body=html_body,
         )
+    except HTTPException:
+        raise
     except Exception as exc:
-        logger.exception("smtp_send_failed", error=str(exc))
+        logger.exception("email_send_failed", error=str(exc))
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Could not send email. Check SMTP settings and try again.",
+            detail="Could not send email. Check email provider settings and try again.",
         ) from exc
 
 

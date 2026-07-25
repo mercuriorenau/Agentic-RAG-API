@@ -29,7 +29,8 @@ export const LEGAL_SECTIONS: LegalSection[] = [
       "Questions, chat history, and retrieved document excerpts are sent to the model " +
         "provider you use (OpenAI or Anthropic) so it can generate an answer.",
       "When the agent runs a web search, your search query is sent to Tavily.",
-      "Verification and password reset emails are delivered through Gmail SMTP.",
+      "Verification and password reset emails are delivered through Brevo " +
+        "(transactional email over HTTPS).",
       "Each of these providers has its own privacy policy and terms.",
     ],
   },

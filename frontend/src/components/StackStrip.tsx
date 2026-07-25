@@ -12,7 +12,7 @@ const STACK_ITEMS = [
   { name: "TypeScript", icon: "language" },
   { name: "Vite", icon: "build" },
   { name: "Google Auth", icon: "auth" },
-  { name: "Gmail SMTP", icon: "mail" },
+  { name: "Brevo", icon: "mail" },
   { name: "SlowAPI", icon: "api" },
   { name: "Docker", icon: "container" },
 ] as const;

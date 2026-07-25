@@ -103,11 +103,11 @@ The query endpoints are rate limited and cap question length on purpose. The def
 git clone https://github.com/mercuriorenau/Agentic-RAG-API.git
 cd Agentic-RAG-API
 cp .env.example .env
-# Edit .env: set SECRET_KEY, at least one LLM API key, and SMTP_* for signup
+# Edit .env: set SECRET_KEY, at least one LLM API key, and BREVO_API_KEY for signup
 docker compose up --build -d
 ```
 
-Email/password signup requires Gmail SMTP (App Password): set `SMTP_USERNAME`, `SMTP_PASSWORD`, and optionally `SMTP_FROM_EMAIL`. Users must verify via the emailed link or 6-digit code before login. Google sign-in is treated as verified. `APP_PUBLIC_URL` is used in verification links.
+Email/password signup requires outbound email. On Railway Hobby, use **Brevo** (HTTPS API): set `BREVO_API_KEY` and `SMTP_FROM_EMAIL` (a sender you verified in Brevo). Locally you can still use Gmail SMTP with `SMTP_USERNAME` / `SMTP_PASSWORD` (App Password). Users must verify via the emailed link or 6-digit code before login. Google sign-in is treated as verified. `APP_PUBLIC_URL` is used in verification links.
 
 The container runs migrations on start. Verify:
 
@@ -268,10 +268,11 @@ Self-RAG and rerank add small-model calls per retrieve, so latency and cost rise
 | `RATE_LIMIT_QUERY` | Query rate limit | `10/day` |
 | `RATE_LIMIT_DISABLED` | Turn off query limits for everyone | `false` |
 | `RATE_LIMIT_BYPASS_EMAILS` | Comma-separated owner emails (unlimited Ask) | |
-| `SMTP_USERNAME` | Gmail address for SMTP | _(required for email signup)_ |
-| `SMTP_PASSWORD` | Gmail App Password | _(required for email signup)_ |
-| `SMTP_FROM_EMAIL` | From address (defaults to username) | |
+| `BREVO_API_KEY` | Brevo transactional email API key | _(recommended on Railway)_ |
+| `SMTP_FROM_EMAIL` | From address (required with Brevo; defaults to username for SMTP) | |
 | `SMTP_FROM_NAME` | Display name for verification/reset email | `Agentic RAG` |
+| `SMTP_USERNAME` | Gmail address for local SMTP fallback | |
+| `SMTP_PASSWORD` | Gmail App Password for local SMTP fallback | |
 | `EMAIL_VERIFICATION_EXPIRE_MINUTES` | Verify link/code lifetime | `10` |
 | `APP_PUBLIC_URL` | Public app URL (verify links + OAuth) | `http://localhost:8000` |
 | `LOG_LEVEL` | Log level | `INFO` |
@@ -284,7 +285,8 @@ Self-RAG and rerank add small-model calls per retrieve, so latency and cost rise
 4. Set variables on the app service:
    - `DATABASE_URL` → reference the pgvector service’s `DATABASE_URL`
    - `SECRET_KEY`, `OPENAI_API_KEY` (and optional Anthropic/Tavily/Google keys)
-   - `SMTP_USERNAME`, `SMTP_PASSWORD` (Gmail App Password) and optional `SMTP_FROM_EMAIL` for email/password signup
+   - `BREVO_API_KEY` and `SMTP_FROM_EMAIL` (verified sender in Brevo) for email/password signup on Hobby
+   - Optional local SMTP fallback: `SMTP_USERNAME` / `SMTP_PASSWORD` (blocked on Railway Hobby)
    - `APP_PUBLIC_URL` → your public Railway domain (used in verification links + OAuth)
    - Prefer `RATE_LIMIT_QUERY=10/day` for public demos (keeps LLM spend bounded)
    - To use the live app yourself without the visitor cap: set `RATE_LIMIT_BYPASS_EMAILS` to your login emails, or temporarily set `RATE_LIMIT_DISABLED=true`
@@ -297,7 +299,8 @@ Self-RAG and rerank add small-model calls per retrieve, so latency and cost rise
 - JWT auth (python-jose, passlib/bcrypt)
 - Agentic tool calling (OpenAI or Anthropic)
 - Tavily web search (optional)
-- Gmail SMTP verification/reset email and SlowAPI rate limiting
+- Brevo transactional email (HTTPS) for verification/reset, with optional Gmail SMTP fallback locally
+- SlowAPI rate limiting
 - React + Vite UI served as static files
 - pytest, ruff, GitHub Actions CI
 - Docker Compose

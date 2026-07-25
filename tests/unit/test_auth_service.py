@@ -13,7 +13,7 @@ from app.services.auth_service import AuthService
 
 @pytest.mark.asyncio
 @patch("app.services.auth_service.send_verification_email", new_callable=AsyncMock)
-@patch("app.services.auth_service.smtp_configured", return_value=True)
+@patch("app.services.auth_service.email_configured", return_value=True)
 async def test_register_creates_pending_signup(mock_smtp, mock_send) -> None:
     db = AsyncMock()
     db.execute.return_value = MagicMock(scalar_one_or_none=MagicMock(return_value=None))
@@ -29,7 +29,7 @@ async def test_register_creates_pending_signup(mock_smtp, mock_send) -> None:
 
 
 @pytest.mark.asyncio
-@patch("app.services.auth_service.smtp_configured", return_value=False)
+@patch("app.services.auth_service.email_configured", return_value=False)
 async def test_register_requires_smtp(mock_smtp) -> None:
     service = AuthService(AsyncMock())
     with pytest.raises(HTTPException) as exc:
@@ -38,7 +38,7 @@ async def test_register_requires_smtp(mock_smtp) -> None:
 
 
 @pytest.mark.asyncio
-@patch("app.services.auth_service.smtp_configured", return_value=True)
+@patch("app.services.auth_service.email_configured", return_value=True)
 async def test_register_verified_email_raises_409(mock_smtp) -> None:
     existing = User(id=uuid4(), email="dup@example.com", hashed_password="x", email_verified=True)
     db = AsyncMock()
@@ -119,7 +119,7 @@ async def test_verify_email_code_success() -> None:
 
 @pytest.mark.asyncio
 @patch("app.services.auth_service.send_password_reset_email", new_callable=AsyncMock)
-@patch("app.services.auth_service.smtp_configured", return_value=True)
+@patch("app.services.auth_service.email_configured", return_value=True)
 async def test_password_reset_only_changes_after_code(mock_smtp, mock_send) -> None:
     from app.core.security import verify_password
 

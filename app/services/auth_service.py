@@ -11,9 +11,9 @@ from app.core.security import create_access_token, get_password_hash, verify_pas
 from app.models import PendingSignup, User
 from app.schemas.auth import UserRegister
 from app.services.email_service import (
+    email_configured,
     send_password_reset_email,
     send_verification_email,
-    smtp_configured,
 )
 
 
@@ -28,7 +28,7 @@ class AuthService:
         No row is written to ``users`` until verification succeeds. Re-registering
         the same unverified email only refreshes the pending row + sends a new code.
         """
-        self._require_smtp()
+        self._require_email()
 
         email = data.email.strip().lower()
         existing_user = await self._get_user_by_email(email)
@@ -189,7 +189,7 @@ class AuthService:
 
     async def resend_verification(self, email: str) -> None:
         """Always succeeds outwardly to avoid email enumeration."""
-        self._require_smtp()
+        self._require_email()
         email = email.strip().lower()
         pending = await self._get_pending_by_email(email)
         if pending is not None:
@@ -203,7 +203,7 @@ class AuthService:
 
     async def request_password_reset(self, email: str) -> None:
         """Send a reset code. Does not change the password until the code is confirmed."""
-        self._require_smtp()
+        self._require_email()
         email = email.strip().lower()
         user = await self._get_user_by_email(email)
         # Only verified password accounts can reset. Always return quietly otherwise.
@@ -269,13 +269,14 @@ class AuthService:
         base = self.settings.app_public_url.rstrip("/")
         return f"{base}/api/v1/auth/verify-email?token={token}"
 
-    def _require_smtp(self) -> None:
-        if not smtp_configured(self.settings):
+    def _require_email(self) -> None:
+        if not email_configured(self.settings):
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail=(
-                    "Email verification is not configured. Set SMTP_USERNAME and "
-                    "SMTP_PASSWORD (Gmail App Password) on the server."
+                    "Email verification is not configured. Set BREVO_API_KEY and "
+                    "SMTP_FROM_EMAIL (recommended on Railway), or SMTP_USERNAME and "
+                    "SMTP_PASSWORD for local Gmail SMTP."
                 ),
             )
 
