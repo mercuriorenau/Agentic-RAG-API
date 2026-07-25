@@ -1,10 +1,71 @@
 # Agentic RAG API
 
-Upload documents into isolated chat workspaces and ask questions. An agent chooses between hybrid document retrieval, web search, or a direct answer, then streams a traceable response with citations.
+Upload documents into isolated chats and ask questions. An agent chooses hybrid retrieval, web search, or a direct answer, then streams a traceable reply with citations.
 
-## Problem
+<!-- Add docs/demo.gif yourself (screen recording of the live UI). -->
+![Agentic RAG demo](docs/demo.gif)
 
-Searching PDFs and notes by hand is slow, and generic chatbots invent answers. This API indexes your files, routes each question through tools, and returns answers you can verify against cited sources.
+*Demo flow: upload → ask → agent route + citations (~30–45s).*
+
+[![Python](https://img.shields.io/badge/Python-3.12-blue.svg)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-async-009688.svg)](https://fastapi.tiangolo.com/)
+[![React](https://img.shields.io/badge/React-Vite-61DAFB.svg)](https://vitejs.dev/)
+
+**[Live demo](https://mercurio-agentic-rag.up.railway.app/)** ·
+**[Repository](https://github.com/mercuriorenau/Agentic-RAG-API)** ·
+**[GitHub](https://github.com/mercuriorenau)** ·
+**[LinkedIn](https://www.linkedin.com/in/mercuriorenau/)**
+
+## Why this exists
+
+This is a **personal educational demo**, not a production SaaS. The goal is to make agentic RAG visible end to end: each chat owns its files, an agent picks tools, retrieval stays capped for token cost, and the UI shows citations, routes, and dashed **i** explainers so you can inspect the pipeline while you use it.
+
+**What you can learn by clicking around**
+
+- How an agent decides among `retrieve_documents`, `web_search`, and `answer_directly`
+- Hybrid search (dense vectors + full-text), RRF fusion, optional rerank, and Self-RAG retries
+- Why survey questions get partial coverage under a hard `top_k` cap (design, not a broken index)
+- Auth and ops choices that show up in a real deploy (email verify, rate limits, ephemeral disk)
+
+## Features
+
+**Auth**
+
+- Email/password signup held until verification (link or 6-digit code)
+- Brevo HTTPS email on Railway; optional Gmail SMTP locally
+- Google OAuth (treated as verified)
+- Password reset via emailed code (password unchanged until confirmed)
+- JWT sessions
+
+**Chats and documents**
+
+- Isolated workspaces: each chat has its own documents and message history
+- Upload PDF / TXT / MD; first upload can rename a default “New chat” from the filename stem
+- Preview and delete per document
+
+**Agent and RAG**
+
+- Tool-calling agent (OpenAI and/or Anthropic)
+- Hybrid retrieve → RRF → optional LLM rerank → Self-RAG grade/rewrite
+- Adaptive `top_k` with a hard demo cap (`TOP_K_MAX`, default 8)
+- Optional Tavily web search
+- Auto model mode picks a provider from simple question heuristics
+
+**UI transparency**
+
+- Streaming agent steps (ops progress, not private chain-of-thought)
+- Collapsible citations and retrieval trace
+- Enter to send, Shift+Enter for a new line
+- First-visit walkthrough; completion stored per account (`onboarded`)
+- Dashed **i** notes next to upload, models, memory, citations, and budget
+
+**Ops**
+
+- Docker Compose locally; Railway-friendly Dockerfile + migrations on boot
+- Ask rate limit per signed-in account (default `10/day`); client lock after a 429
+- Question length cap; upload size cap
+- Offline + optional live evals under `evals/`
+- GitHub Actions CI (lint, pytest, frontend build)
 
 ## Architecture
 
@@ -12,8 +73,8 @@ Searching PDFs and notes by hand is slow, and generic chatbots invent answers. T
 flowchart TB
   UI[React_UI]
   API[FastAPI]
-  Auth[JWT_and_verified_signup]
-  Email[Gmail_SMTP]
+  Auth[JWT_verify_Google]
+  Email[Brevo_or_SMTP]
   Agent[AgentService]
   Retrieve[retrieve_documents]
   Web[web_search]
@@ -22,7 +83,7 @@ flowchart TB
   LLM[OpenAI_or_Anthropic]
   Tavily[Tavily]
 
-  UI -->|signup_verify_login_upload_ask| API
+  UI -->|signup_login_upload_ask| API
   API --> Auth
   Auth --> Email
   API --> Agent
@@ -34,135 +95,131 @@ flowchart TB
   Web --> Tavily
 ```
 
-**Ingestion:** upload → extract text with page numbers when available (PDF/TXT/MD) → overlapping paragraph chunks → embed (`text-embedding-3-small`) → store in PostgreSQL with pgvector.
+**Ingestion:** upload → extract text (page numbers on PDFs when available) → overlapping paragraph chunks (`CHUNK_SIZE` / `CHUNK_OVERLAP`) → embed (`text-embedding-3-small`) → store in PostgreSQL with pgvector. Re-upload after changing chunk settings so old files pick up the new strategy.
 
-**Chunking:** paragraph-based splits driven by `CHUNK_SIZE` / `CHUNK_OVERLAP` (defaults `800` / `100`). PDF chunks keep `page_number` for citations. Re-upload existing documents after changing chunking so they pick up the new strategy.
+**Retrieval:** dense (pgvector) + Postgres full-text → Reciprocal Rank Fusion → score floor → optional listwise LLM rerank → Self-RAG may grade evidence and rewrite/retry (up to `SELF_RAG_MAX_RETRIES`). Broad questions may raise `top_k` toward `TOP_K_MAX`; the agent still does not load the whole PDF.
 
-**Retrieval:** hybrid dense (pgvector) + Postgres full-text search, fused with Reciprocal Rank Fusion (RRF), filtered by `RETRIEVAL_MIN_SCORE`, then optionally reranked with a small LLM (`RERANK_MODEL`, default `gpt-4o-mini`). When Self-RAG is enabled, the system grades evidence quality and may rewrite the query and retry retrieve (up to `SELF_RAG_MAX_RETRIES`).
-
-**Model selection:** each query can request `auto`, `openai`, or `anthropic`. Auto mode inspects the question before the agent call, chooses a configured provider/model, and returns an explanation of the decision.
-
-**Query:** the selected LLM calls tools as needed (`retrieve_documents`, `web_search`, `answer_directly`), then produces a final answer with citations, optional `retrieval_trace` (Self-RAG attempts), and a `route` field (`retrieve` | `web` | `direct` | `mixed`). Empty retrieve results return no document citations; the agent is instructed not to invent document content.
-
-**Authentication:** Google accounts are verified immediately. Email/password signup stays in `pending_signups` until the user confirms the emailed link or 6-digit code; only then is the `users` row created. Password reset changes nothing until its emailed code is confirmed.
-
-**UI walkthrough:** the web app shows short explainers next to upload, model choice, answers, and citations so you can see chunking, retrieval, tool routing, and grounding while you use the demo. “Agent steps” are operational progress events (model selection, tool calls, retrieval, and writing), not private chain-of-thought.
+**Query:** the selected model calls tools as needed, then returns an answer with citations, optional `retrieval_trace`, and a `route` (`retrieve` | `web` | `direct` | `mixed`). Empty retrieve means no document citations; the agent is instructed not to invent file content.
 
 ## Live demo
 
-Deploy your own instance to Railway (see below) or run locally with Docker Compose. Open the root URL for the web UI, or `/docs` for OpenAPI.
+Open **[https://mercurio-agentic-rag.up.railway.app/](https://mercurio-agentic-rag.up.railway.app/)**.
 
-> Set at least one LLM key (`OPENAI_API_KEY` or `ANTHROPIC_API_KEY`). Set `TAVILY_API_KEY` if you want web search. Uploaded files on Railway use ephemeral disk and are lost on redeploy.
+Caveats (intentional for a public portfolio demo):
 
-## API endpoints
+- Needs at least one LLM key on the server (`OPENAI_API_KEY` and/or `ANTHROPIC_API_KEY`); web search needs `TAVILY_API_KEY`
+- Uploaded files on Railway Hobby use **ephemeral disk** and disappear on redeploy
+- Default **10 Ask requests per account per day**; after a too many requests (429) response the UI also locks Ask/Upload for that account on the client
+- Prefer short PDFs (~15 pages) or questions about one section at a time
 
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| GET | `/health` | No | Health check |
-| POST | `/api/v1/auth/register` | No | Start pending signup; send verification link + code |
-| POST | `/api/v1/auth/login` | No | Get JWT (requires verified email) |
-| POST | `/api/v1/auth/verify-email` | No | Verify with 6-digit code (returns JWT) |
-| GET | `/api/v1/auth/verify-email?token=` | No | Verify via email link (redirects signed in) |
-| POST | `/api/v1/auth/resend-verification` | No | Resend link + code |
-| POST | `/api/v1/auth/forgot-password` | No | Send password reset code (password unchanged until confirmed) |
-| POST | `/api/v1/auth/reset-password` | No | Confirm reset code + set new password (returns JWT) |
-| GET | `/api/v1/models` | No | List available model choices |
-| GET | `/api/v1/chats` | JWT | List chat sessions (creates one if empty) |
-| POST | `/api/v1/chats` | JWT | Create a chat session |
-| PATCH | `/api/v1/chats/{id}` | JWT | Rename a chat |
-| DELETE | `/api/v1/chats/{id}` | JWT | Delete a chat and its documents |
-| GET | `/api/v1/chats/{id}/messages` | JWT | List messages in a chat |
-| DELETE | `/api/v1/chats/{id}/messages` | JWT | Clear chat message history |
-| POST | `/api/v1/documents` | JWT | Upload document (requires `chat_id` form field) |
-| GET | `/api/v1/documents` | JWT | List documents for a chat (`?chat_id=`) |
-| GET | `/api/v1/documents/{id}/file` | JWT | Preview / download original file |
-| DELETE | `/api/v1/documents/{id}` | JWT | Delete document |
-| POST | `/api/v1/queries` | JWT | Ask a question (agent; requires `chat_id`) |
-| POST | `/api/v1/queries/stream` | JWT | Ask with SSE progress events and final response |
+## Quick start
 
-Interactive docs: `http://localhost:8000/docs`
-
-Query response includes `answer`, `citations`, `tools_used`, `route`, `model_provider`, `model_name`, `model_selection_explanation`, and optional `retrieval_trace`.
-
-Each chat owns its own documents and message history. Retrieval only searches documents attached to the `chat_id` on the query. `POST /api/v1/queries` also accepts optional `history` (prior question/answer turns); if omitted, the server loads recent turns from that chat.
-
-Available models are exposed at `GET /api/v1/models`. The UI dropdown only shows providers whose API keys are configured.
-
-The query endpoints are rate limited and cap question length on purpose. The default is 10 Ask requests per signed-in account per day. After a too many requests (429) response, the UI also locks Ask and Upload in that tab for up to about 24 hours (sessionStorage; closing the tab clears the lock). Uploads are not independently rate-limited by the API. Emails in `RATE_LIMIT_BYPASS_EMAILS` bypass the query limit.
-
-## Local setup
-
-### Prerequisites
-
-- Docker and Docker Compose
-- An OpenAI API key (or Anthropic, via `LLM_PROVIDER=anthropic`)
-
-### Steps
+**Prerequisites:** Docker, Docker Compose, and at least one LLM API key.
 
 ```bash
 git clone https://github.com/mercuriorenau/Agentic-RAG-API.git
 cd Agentic-RAG-API
 cp .env.example .env
-# Edit .env: set SECRET_KEY, at least one LLM API key, and BREVO_API_KEY for signup
+# Set SECRET_KEY, OPENAI_API_KEY and/or ANTHROPIC_API_KEY
+# For email/password signup: BREVO_API_KEY + SMTP_FROM_EMAIL (verified sender)
 docker compose up --build -d
 ```
 
-Email/password signup requires outbound email. On Railway Hobby, use **Brevo** (HTTPS API): set `BREVO_API_KEY` and `SMTP_FROM_EMAIL` (a sender you verified in Brevo). Locally you can still use Gmail SMTP with `SMTP_USERNAME` / `SMTP_PASSWORD` (App Password). Users must verify via the emailed link or 6-digit code before login. Google sign-in is treated as verified. `APP_PUBLIC_URL` is used in verification links.
+- UI: `http://localhost:8000`
+- OpenAPI: `http://localhost:8000/docs`
+- Health: `curl http://localhost:8000/health`
 
-The container runs migrations on start. Verify:
+Email/password signup needs outbound email. On Railway Hobby use **Brevo** (`BREVO_API_KEY`, `SMTP_FROM_EMAIL`). Locally you can use Gmail SMTP (`SMTP_USERNAME` / `SMTP_PASSWORD` App Password). Set `APP_PUBLIC_URL` for verification links and OAuth callbacks.
 
-```bash
-curl http://localhost:8000/health
-```
-
-Open `http://localhost:8000` for the UI.
-
-### Example usage
+## Example usage
 
 ```bash
-# Register (sends verification email; check inbox for link or code)
+# Register (sends verification email)
 curl -X POST http://localhost:8000/api/v1/auth/register \
   -H "Content-Type: application/json" \
   -d '{"email":"you@example.com","password":"password123"}'
 
-# Verify with code from the email (returns JWT and signs you in)
+# Verify with the 6-digit code from the email (returns JWT)
 TOKEN=$(curl -s -X POST http://localhost:8000/api/v1/auth/verify-email \
   -H "Content-Type: application/json" \
   -d '{"email":"you@example.com","code":"123456"}' | jq -r .access_token)
 
-# Or login later with the same email/password
-# TOKEN=$(curl -s -X POST http://localhost:8000/api/v1/auth/login \
-#   -H "Content-Type: application/json" \
-#   -d '{"email":"you@example.com","password":"password123"}' | jq -r .access_token)
-
-# Get the auto-created workspace (or POST /api/v1/chats to make another)
+# Workspace (auto-created on first list, or POST /api/v1/chats)
 CHAT_ID=$(curl -s http://localhost:8000/api/v1/chats \
   -H "Authorization: Bearer $TOKEN" | jq -r '.chats[0].id')
 
-# Upload one of your own documents into that chat
+# Upload one of your own documents
 curl -X POST http://localhost:8000/api/v1/documents \
   -H "Authorization: Bearer $TOKEN" \
   -F "chat_id=$CHAT_ID" \
   -F "file=@./path/to/document.pdf"
 
-# Ask in the same chat
+# Ask
 curl -X POST http://localhost:8000/api/v1/queries \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"question":"What does the document say about refunds?","chat_id":"'"$CHAT_ID"'"}'
 ```
 
-## Development without Docker
+## API
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/health` | No | Health check |
+| POST | `/api/v1/auth/register` | No | Start pending signup; send verify link + code |
+| POST | `/api/v1/auth/login` | No | JWT (verified email required) |
+| POST | `/api/v1/auth/verify-email` | No | Verify with 6-digit code (returns JWT) |
+| GET | `/api/v1/auth/verify-email?token=` | No | Verify via link (redirects signed in) |
+| POST | `/api/v1/auth/resend-verification` | No | Resend link + code |
+| POST | `/api/v1/auth/forgot-password` | No | Send reset code |
+| POST | `/api/v1/auth/reset-password` | No | Confirm code + new password (returns JWT) |
+| GET | `/api/v1/auth/google` | No | Start Google OAuth |
+| GET | `/api/v1/models` | No | Available model choices |
+| GET | `/api/v1/chats` | JWT | List chats (creates one if empty) |
+| POST | `/api/v1/chats` | JWT | Create chat |
+| PATCH | `/api/v1/chats/{id}` | JWT | Rename chat |
+| DELETE | `/api/v1/chats/{id}` | JWT | Delete chat and its documents |
+| GET | `/api/v1/chats/{id}/messages` | JWT | List messages |
+| DELETE | `/api/v1/chats/{id}/messages` | JWT | Clear message history |
+| POST | `/api/v1/documents` | JWT | Upload (`chat_id` form field) |
+| GET | `/api/v1/documents` | JWT | List docs (`?chat_id=`) |
+| GET | `/api/v1/documents/{id}/file` | JWT | Preview / download |
+| DELETE | `/api/v1/documents/{id}` | JWT | Delete document |
+| POST | `/api/v1/queries` | JWT | Ask (requires `chat_id`) |
+| POST | `/api/v1/queries/stream` | JWT | Ask with SSE steps + final response |
+| GET | `/api/v1/auth/me` | JWT | Current user (includes `onboarded`) |
+| POST | `/api/v1/auth/onboarded` | JWT | Mark first-visit tour done |
+
+Interactive docs: `/docs`. Query responses include `answer`, `citations`, `tools_used`, `route`, `model_provider`, `model_name`, `model_selection_explanation`, and optional `retrieval_trace`. Retrieval only searches documents on the query’s `chat_id`.
+
+## Configuration
+
+Copy `.env.example` for the full list. Important knobs:
+
+| Variable | Role | Default |
+|----------|------|---------|
+| `DATABASE_URL` | Async Postgres URL | local Compose URL |
+| `SECRET_KEY` | JWT signing | change in production |
+| `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` | LLM providers | at least one |
+| `TAVILY_API_KEY` | Web search | optional |
+| `CHAT_MODEL` / `ANTHROPIC_CHAT_MODEL` | Default chat models | `gpt-4.1` / `claude-sonnet-4-5` |
+| `TOP_K` / `TOP_K_MAX` | Focused vs capped survey retrieve | `5` / `8` |
+| `SELF_RAG_ENABLED` / `RERANK_ENABLED` | Grade/rewrite and listwise rerank | `true` |
+| `RATE_LIMIT_QUERY` | Ask budget per account | `10/day` |
+| `RATE_LIMIT_BYPASS_EMAILS` | Owner emails exempt from Ask limit | empty |
+| `MAX_QUERY_LENGTH` | Question character cap | `600` |
+| `BREVO_API_KEY` / `SMTP_FROM_EMAIL` | Signup/reset email (Railway) | required for email auth on Hobby |
+| `APP_PUBLIC_URL` | Public URL for verify links + OAuth | `http://localhost:8000` |
+
+## Development, tests, and evals
 
 ```bash
 python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-
-# Frontend (optional for local API-only work)
 cd frontend && npm install && npm run build && cd ..
 
-# Start Postgres with pgvector locally, then:
+# Postgres with pgvector running, then:
 cp .env.example .env
 alembic upgrade head
 uvicorn app.main:app --reload
@@ -170,29 +227,21 @@ pytest --cov=app
 python -m evals.run_evals
 ```
 
-For frontend hot reload against a local API:
+Frontend hot reload (Vite proxies `/api` → `http://localhost:8000`):
 
 ```bash
 cd frontend && npm run dev
 ```
 
-Vite proxies `/api` to `http://localhost:8000`.
+**Evals**
 
-## Evals
+| Command | What it does |
+|---------|----------------|
+| `python -m evals.run_evals` | Offline heuristics on canned samples (CI-safe) |
+| `python -m evals.run_evals --live` | Seed fixtures, real retrieve (+ agent when keys allow) |
+| `python -m evals.run_evals --live --judge` | Live path + LLM-as-judge (extra API cost) |
 
-Heuristic evals live in `evals/`:
-
-- `cases.json`: questions, expected routes, keywords, and fixture names
-- `fixtures/`: sample documents seeded for live runs
-- `scorers.py`: retrieval relevance and answer groundedness
-- `judges.py`: optional LLM-as-judge faithfulness / answer relevance
-- `python -m evals.run_evals`: offline, CI-safe (uses canned samples)
-- `python -m evals.run_evals --live`: seeds fixtures into Postgres, runs real retrieve (+ agent when keys allow)
-- `python -m evals.run_evals --live --judge`: live path plus LLM judge scores (extra API cost)
-
-Live mode needs `DATABASE_URL`, `OPENAI_API_KEY` (embeddings), and a running Postgres with pgvector. `--judge` also needs `OPENAI_API_KEY`.
-
-Pytest covers the scorers under `tests/evals/`.
+Scorers cover retrieval relevance, groundedness, and route match (`evals/scorers.py`). Cases and fixtures live under `evals/`.
 
 ### Latest offline results
 
@@ -210,103 +259,32 @@ Pytest covers the scorers under `tests/evals/`.
 | retrieve_no_relevant | 1.0 | 1.0 | 1.0 |
 | retrieve_paraphrase_return_window | 1.0 | 0.571 | 1.0 |
 
-Low relevance on `web_current_event` and low groundedness on `ungrounded_hallucination` are expected in the fixture design (web path / intentional weak grounding). Re-run the command after changing scorers or cases and refresh this table.
+Low relevance on `web_current_event` and low groundedness on `ungrounded_hallucination` are expected by fixture design. Refresh this table after changing scorers or cases.
 
-## RAG quality knobs
-
-| Variable | Role | Default |
-|----------|------|---------|
-| `CHUNK_SIZE` / `CHUNK_OVERLAP` | Paragraph-aware chunk windows | `800` / `100` |
-| `TOP_K` | Base passages for focused questions | `5` |
-| `TOP_K_MAX` | Hard cap when adaptive retrieval widens the budget | `8` |
-| `ADAPTIVE_TOP_K` | Raise `top_k` toward the max for broad/survey queries | `true` |
-| `CANDIDATE_MULTIPLIER` | Dense/FTS pool size = adaptive `top_k × multiplier` (per channel) | `4` |
-| `RETRIEVAL_MIN_SCORE` | Drop weak matches (cosine or mapped FTS) | `0.25` |
-| `RERANK_ENABLED` | LLM listwise rerank after fusion | `true` |
-| `RERANK_MODEL` | Model used for rerank / Self-RAG / judge | `gpt-4o-mini` |
-| `SELF_RAG_ENABLED` | Grade evidence and rewrite/retry weak retrieves | `true` |
-| `SELF_RAG_MAX_RETRIES` | Extra retrieve attempts after the first | `2` |
-
-Self-RAG and rerank add small-model calls per retrieve, so latency and cost rise slightly when enabled.
-
-**Adaptive `top_k` (token budget):** focused questions stay near `TOP_K`. Broad prompts (“each case”, “summarize the document”, “todos los casos”) may use a higher value up to `TOP_K_MAX` (default 8). The agent still does **not** load the whole PDF. Incomplete coverage on survey questions is an intentional cost limit for this demo, not a broken index. Prefer one case/section per question for fuller answers. For best demo results, keep uploads around **15 pages or fewer**; longer files work better with focused questions. After changing chunking settings, **re-upload documents** so chunks and embeddings regenerate. Older uploads keep their previous chunk boundaries.
-
-## Environment variables
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `DATABASE_URL` | Async PostgreSQL URL | `postgresql+asyncpg://...` |
-| `SECRET_KEY` | JWT signing key | `change-me-in-production` |
-| `OPENAI_API_KEY` | OpenAI API key | at least one LLM key |
-| `ANTHROPIC_API_KEY` | Anthropic API key | at least one LLM key |
-| `TAVILY_API_KEY` | Tavily web search key | optional |
-| `LLM_PROVIDER` | `openai` or `anthropic` | `openai` |
-| `EMBEDDING_MODEL` | Embedding model | `text-embedding-3-small` |
-| `CHAT_MODEL` | OpenAI chat model | `gpt-4.1` |
-| `ANTHROPIC_CHAT_MODEL` | Anthropic chat model | `claude-sonnet-4-5` |
-| `GOOGLE_CLIENT_ID` | Google OAuth client ID | optional |
-| `GOOGLE_CLIENT_SECRET` | Google OAuth client secret | optional |
-| `GOOGLE_REDIRECT_URI` | Google OAuth callback URL | `http://localhost:8000/api/v1/auth/google/callback` |
-| `CHUNK_SIZE` | Characters per chunk | `800` |
-| `CHUNK_OVERLAP` | Chunk overlap | `100` |
-| `TOP_K` | Base chunks for focused questions | `5` |
-| `TOP_K_MAX` | Hard cap for adaptive broad queries | `8` |
-| `ADAPTIVE_TOP_K` | Enable adaptive top_k | `true` |
-| `CANDIDATE_MULTIPLIER` | Hybrid candidate pool multiplier (applied to adaptive top_k) | `4` |
-| `RETRIEVAL_MIN_SCORE` | Minimum retrieve score (0-1) | `0.25` |
-| `RERANK_ENABLED` | Enable LLM rerank after hybrid fusion | `true` |
-| `RERANK_MODEL` | Rerank / Self-RAG / judge chat model | `gpt-4o-mini` |
-| `SELF_RAG_ENABLED` | Enable Self-RAG grade/rewrite/retry | `true` |
-| `SELF_RAG_MAX_RETRIES` | Extra Self-RAG retrieve attempts | `2` |
-| `AGENT_MAX_TOOL_ROUNDS` | Max tool calling rounds | `5` |
-| `CONVERSATION_HISTORY_MAX_TURNS` | Recent Q&A turns supplied to follow-ups | `6` |
-| `MAX_QUERY_LENGTH` | Max question length in characters | `600` |
-| `UPLOAD_DIR` | File storage path | `./uploads` |
-| `MAX_UPLOAD_SIZE_MB` | Upload size limit | `10` |
-| `STATIC_DIR` | Built frontend path | `./frontend/dist` |
-| `RATE_LIMIT_AUTH` | Auth rate limit | `10/minute` |
-| `RATE_LIMIT_QUERY` | Query rate limit | `10/day` |
-| `RATE_LIMIT_DISABLED` | Turn off query limits for everyone | `false` |
-| `RATE_LIMIT_BYPASS_EMAILS` | Comma-separated owner emails (unlimited Ask) | |
-| `BREVO_API_KEY` | Brevo transactional email API key | _(recommended on Railway)_ |
-| `SMTP_FROM_EMAIL` | From address (required with Brevo; defaults to username for SMTP) | |
-| `SMTP_FROM_NAME` | Display name for verification/reset email | `Agentic RAG` |
-| `SMTP_USERNAME` | Gmail address for local SMTP fallback | |
-| `SMTP_PASSWORD` | Gmail App Password for local SMTP fallback | |
-| `EMAIL_VERIFICATION_EXPIRE_MINUTES` | Verify link/code lifetime | `10` |
-| `APP_PUBLIC_URL` | Public app URL (verify links + OAuth) | `http://localhost:8000` |
-| `LOG_LEVEL` | Log level | `INFO` |
-
-## Railway deployment
+## Deploy (Railway)
 
 1. Create a Railway project.
-2. Add **Postgres with pgvector** (not plain Postgres). Railway’s default Postgres image does **not** include the `vector` extension; without it boot fails on `alembic upgrade` / `CREATE EXTENSION vector`.
-3. Deploy this repo as a service (`railway.toml` + `Dockerfile`).
-4. Set variables on the app service:
-   - `DATABASE_URL` → reference the pgvector service’s `DATABASE_URL`
-   - `SECRET_KEY`, `OPENAI_API_KEY` (and optional Anthropic/Tavily/Google keys)
-   - `BREVO_API_KEY` and `SMTP_FROM_EMAIL` (verified sender in Brevo) for email/password signup on Hobby
-   - Optional local SMTP fallback: `SMTP_USERNAME` / `SMTP_PASSWORD` (blocked on Railway Hobby)
-   - `APP_PUBLIC_URL` → your public Railway domain (used in verification links + OAuth)
-   - Prefer `RATE_LIMIT_QUERY=10/day` for public demos (keeps LLM spend bounded)
-   - To use the live app yourself without the visitor cap: set `RATE_LIMIT_BYPASS_EMAILS` to your login emails, or temporarily set `RATE_LIMIT_DISABLED=true`
-5. **Settings → Networking → Generate Domain** (unexposed services have no public URL).
-6. Migrations run via `entrypoint.sh` on boot; the app listens on Railway’s `$PORT`.
+2. Add **Postgres with pgvector** (plain Postgres lacks `vector`; boot fails on `CREATE EXTENSION vector`).
+3. Deploy this repo (`railway.toml` + `Dockerfile`).
+4. Set on the app service: `DATABASE_URL`, `SECRET_KEY`, LLM keys, `BREVO_API_KEY` + `SMTP_FROM_EMAIL` for email auth, `APP_PUBLIC_URL` to your public domain, optional Google/Tavily keys, and `RATE_LIMIT_QUERY=10/day` for public demos.
+5. Generate a public domain under Networking.
+6. `entrypoint.sh` runs `alembic upgrade head` and listens on `$PORT`.
 
-## Tech stack
+## Project structure
 
-- FastAPI, SQLAlchemy 2 (async), Alembic, PostgreSQL + pgvector
-- JWT auth (python-jose, passlib/bcrypt)
-- Agentic tool calling (OpenAI or Anthropic)
-- Tavily web search (optional)
-- Brevo transactional email (HTTPS) for verification/reset, with optional Gmail SMTP fallback locally
-- SlowAPI rate limiting
-- React + Vite UI served as static files
-- pytest, ruff, GitHub Actions CI
-- Docker Compose
+```text
+app/                 FastAPI app, auth, RAG agent, tools, email
+alembic/             Schema migrations
+frontend/            React + Vite UI
+evals/               Offline + live evaluation harness
+tests/               Unit and integration tests
+docs/demo.gif        Screen recording (add this file)
+Dockerfile           Production image
+docker-compose.yml   Local API + pgvector
+```
 
-## Future work
+## Disclaimer
 
-- S3-compatible file storage
-- Refresh tokens
-- DOCX support
+Solo portfolio / learning demo. Do not upload confidential data. Fair-use rate limits and retrieval caps are intentional to keep API cost bounded. No warranty; use at your own risk.
+
+There is no separate license file in this repo yet. Treat the code as source-available for portfolio review unless a `LICENSE` is added later.
