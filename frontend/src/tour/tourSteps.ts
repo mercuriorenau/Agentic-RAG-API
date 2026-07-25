@@ -8,8 +8,10 @@ export type TourStep = {
 export const TOUR_INVITE = {
   title: "Want a quick walkthrough?",
   body:
-    "This project is an agentic RAG demo: each chat owns its documents, and an agent decides when to retrieve from your files, search the web, or answer directly. " +
-    "Retrieval is intentionally capped for demo token cost. Prefer short PDFs or questions about one section at a time. " +
+    "This project exists so more people can see how an AI agent actually works with RAG. " +
+    "Each chat owns its documents, and an agent decides when to retrieve from your files, search the web, or answer directly. " +
+    "Every panel has a dashed i icon with the technical detail behind it, so open those as you explore. " +
+    "Retrieval is intentionally capped for demo token cost, so prefer short PDFs or questions about one section at a time. " +
     "I can show you the flow in about a minute.",
   acceptLabel: "Take the guide",
   declineLabel: "Skip for now",
@@ -44,17 +46,20 @@ export const TOUR_STEPS: TourStep[] = [
   },
   {
     id: "tech-notes",
-    title: "Dashed info icons",
+    title: "Open the dashed info icons",
     body:
-      "Tap a dashed i for technical notes on chats, uploads, models, memory, citations, and the retrieval budget. They stay tucked away until you want the detail.",
+      "This is where the learning happens. Tap any dashed i for technical notes on chats, uploads, " +
+      "models, memory, citations, and the retrieval budget. Each one explains a real piece of the " +
+      "RAG pipeline in plain language, so open them as you go instead of skipping past.",
     target: '[data-tour="tech-note"]',
   },
   {
     id: "answers",
     title: "Traceable answers",
     body:
-      `Each reply shows route, model, tool call counts, citations, and a search log ` +
-      `(Self-RAG grades, top_k, candidates, rerank) so you can verify what the agent used.`,
+      "Each reply shows route, model, tool call counts, citations, and a search log " +
+      "(Self-RAG grades, top_k, candidates, rerank) so you can verify what the agent used. " +
+      "Expand those sections to watch the agent reason instead of taking the answer on faith.",
     target: '[data-tour="turns"]',
   },
 ];

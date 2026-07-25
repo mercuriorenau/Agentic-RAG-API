@@ -2080,9 +2080,19 @@ button.linkish.danger:hover:not(:disabled) {
   margin-bottom: 0.5rem;
 }
 
-.citations-head h3 {
-  margin: 0;
-  font-size: 0.95rem;
+.citations-toggle {
+  padding: 0.15rem 0;
+  font-size: 0.78rem;
+  font-family: var(--font-mono);
+  color: var(--muted);
+  background: transparent;
+  box-shadow: none;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+.citations-toggle:hover {
+  color: var(--accent);
 }
 
 .citations ul {
