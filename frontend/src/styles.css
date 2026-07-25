@@ -915,7 +915,16 @@ textarea {
 }
 
 .front-chat {
-  padding: 0.5rem;
+  display: grid;
+  gap: 0.9rem;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.front-chat .chat-row {
+  padding: 0.15rem;
   border-radius: 14px;
   background: var(--surface);
   box-shadow: var(--shadow-soft);
@@ -938,8 +947,8 @@ textarea {
 .front-chat-title[data-tooltip]:hover::after {
   content: attr(data-tooltip);
   position: absolute;
-  left: 0.7rem;
-  top: calc(100% + 0.45rem);
+  left: 0.55rem;
+  top: calc(100% + 0.7rem);
   z-index: 5;
   max-width: min(22rem, 70vw);
   padding: 0.4rem 0.55rem;
@@ -1166,7 +1175,7 @@ textarea {
 }
 
 .chat-docs {
-  margin-left: 0.7rem;
+  margin-left: 0;
   padding: 0.6rem 0.7rem 0.7rem;
   border-left: 0;
   border-radius: 12px;
@@ -1518,14 +1527,15 @@ button.linkish.danger:hover:not(:disabled) {
 
 .preview-text {
   margin: 0;
-  padding: 1.25rem;
+  padding: 1.25rem 1.4rem;
   overflow: auto;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
   font-family: var(--font-mono);
   font-size: 0.85rem;
-  line-height: 1.45;
-  background: #fff;
-  color: var(--ink);
+  line-height: 1.5;
+  background: #171c13;
+  color: #e8f0dc;
   border-radius: inherit;
 }
 
