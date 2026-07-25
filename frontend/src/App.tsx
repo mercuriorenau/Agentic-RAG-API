@@ -21,6 +21,7 @@ import {
   ModelOption,
   QueryResponse,
   register,
+  renameChat,
   resendVerification,
   resetPassword,
   setToken,
@@ -48,6 +49,7 @@ import { ThinkingReplay } from "./components/ThinkingReplay";
 import { TypewriterText } from "./components/TypewriterText";
 import { StackStrip } from "./components/StackStrip";
 import { AuthForm } from "./components/AuthForm";
+import { chatTitleFromFilename } from "./documentNames";
 import { LegalNotice } from "./components/LegalNotice";
 import { ProfileLinks } from "./components/ProfileLinks";
 import {
@@ -181,6 +183,23 @@ export default function App() {
         thinkingSteps: turn.thinkingSteps,
       })),
     );
+    // Pick up server-side repair when a default-titled chat already has docs.
+    setChats((prev) => {
+      const current = prev.find((chat) => chat.id === chatId);
+      if (
+        !current ||
+        docs.length === 0 ||
+        (current.title !== "New chat" && current.title !== "Default chat")
+      ) {
+        return prev;
+      }
+      const oldest = docs[docs.length - 1];
+      const nextTitle = chatTitleFromFilename(oldest.filename);
+      if (!nextTitle || nextTitle === current.title) {
+        return prev;
+      }
+      return prev.map((chat) => (chat.id === chatId ? { ...chat, title: nextTitle } : chat));
+    });
   }
 
   async function refreshModels() {
@@ -435,6 +454,28 @@ export default function App() {
     beginBusy("upload");
     try {
       await uploadDocument(activeChatId, file);
+      const nextTitle = chatTitleFromFilename(file.name);
+      const shouldRename =
+        Boolean(nextTitle) &&
+        Boolean(
+          chats.find(
+            (chat) =>
+              chat.id === activeChatId &&
+              (chat.title === "New chat" || chat.title === "Default chat"),
+          ),
+        );
+      if (shouldRename && nextTitle) {
+        setChats((prev) =>
+          prev.map((chat) =>
+            chat.id === activeChatId ? { ...chat, title: nextTitle } : chat,
+          ),
+        );
+        try {
+          await renameChat(activeChatId, nextTitle);
+        } catch {
+          // Backend upload rename is the primary path; ignore rename races.
+        }
+      }
       setDocuments(await listDocuments(activeChatId));
       await refreshChats(activeChatId);
     } catch (err) {

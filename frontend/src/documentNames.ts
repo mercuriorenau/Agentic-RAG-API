@@ -17,3 +17,10 @@ export function displayDocumentName(filename: string | null | undefined): string
   const ext = match[1].toLowerCase();
   return FRIENDLY_BY_EXT[ext] || `Uploaded ${ext}`;
 }
+
+/** Chat title from an upload: basename without the final extension. */
+export function chatTitleFromFilename(filename: string | null | undefined): string {
+  const base = displayDocumentName(filename).split(/[/\\]/).pop()?.trim() || "upload";
+  const stem = base.replace(/\.[^.]+$/, "").trim();
+  return (stem || base).slice(0, 200);
+}

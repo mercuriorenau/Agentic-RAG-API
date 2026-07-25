@@ -222,6 +222,14 @@ export async function createChat(title = "New chat"): Promise<ChatItem> {
   );
 }
 
+export async function renameChat(id: string, title: string): Promise<ChatItem> {
+  return request<ChatItem>(
+    `/api/v1/chats/${id}`,
+    { method: "PATCH", body: JSON.stringify({ title }) },
+    true,
+  );
+}
+
 export async function deleteChat(id: string): Promise<void> {
   await request(`/api/v1/chats/${id}`, { method: "DELETE" }, true);
 }
