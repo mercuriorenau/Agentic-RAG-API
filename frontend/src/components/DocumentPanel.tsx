@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { DocumentItem, fetchDocumentBlob } from "../api";
 import { DOC_UPLOAD } from "../explainers";
 import { displayDocumentName } from "../documentNames";
+import { UPLOAD_SENSITIVE_WARNING } from "../legal";
 import { Explainer } from "./Explainer";
 
 type Props = {
@@ -155,6 +156,7 @@ export function DocumentPanel({
           onChange={handleChange}
         />
       </div>
+      <p className="upload-caution muted">{UPLOAD_SENSITIVE_WARNING}</p>
       {uploading ? (
         <p className="upload-busy" role="status" aria-live="polite" aria-busy="true">
           <span className="busy-spinner busy-spinner-inline" aria-hidden="true" />

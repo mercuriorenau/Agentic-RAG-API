@@ -432,6 +432,13 @@ button.danger {
   justify-items: stretch;
   flex: 0 1 auto;
   min-height: 0;
+  /* Fallback so extreme zoom scrolls the card instead of clipping the legal line. */
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.auth-screen-inner::-webkit-scrollbar {
+  display: none;
 }
 
 .auth-screen .stack-strip {
@@ -439,7 +446,8 @@ button.danger {
 }
 
 .auth-screen .stack-strip-note {
-  display: none;
+  margin-top: 0.45rem;
+  font-size: 0.66rem;
 }
 
 .stack-strip {
@@ -650,6 +658,14 @@ button.danger {
 
   .stack-strip-label {
     margin-bottom: 0.4rem;
+  }
+
+  .auth-screen .stack-strip-note {
+    margin-top: 0.3rem;
+  }
+
+  .auth-legal {
+    font-size: 0.68rem;
   }
 }
 
@@ -1273,6 +1289,140 @@ button.linkish.danger:hover:not(:disabled) {
   place-items: center;
   padding: 1.5rem;
   background: rgba(18, 24, 22, 0.78);
+}
+
+.upload-caution {
+  margin: 0.35rem 0 0;
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+
+.auth-legal {
+  margin: 0;
+  text-align: center;
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+
+.legal-trigger {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--accent);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.legal-trigger:hover {
+  background: transparent;
+  color: var(--accent);
+  opacity: 0.82;
+}
+
+.legal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: grid;
+  place-items: center;
+  padding: 1.25rem;
+  background: rgba(12, 16, 10, 0.82);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.legal-modal {
+  width: min(38rem, 100%);
+  max-height: min(86vh, 44rem);
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border-radius: var(--radius);
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.45), var(--shadow-inset);
+  overflow: hidden;
+}
+
+.legal-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 1.1rem 1.25rem 0.85rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.legal-modal-head h2 {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.legal-close {
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  box-shadow: none;
+}
+
+.legal-close svg {
+  width: 1.15rem;
+  height: 1.15rem;
+  display: block;
+}
+
+.legal-close:hover {
+  background: var(--ghost);
+  color: var(--ink);
+}
+
+.legal-modal-body {
+  padding: 1rem 1.25rem 1.35rem;
+  overflow-y: auto;
+}
+
+.legal-intro {
+  margin: 0 0 1.1rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.legal-section {
+  margin-bottom: 1.1rem;
+}
+
+.legal-section:last-child {
+  margin-bottom: 0;
+}
+
+.legal-section h3 {
+  margin: 0 0 0.4rem;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.legal-section p {
+  margin: 0 0 0.5rem;
+  font-size: 0.86rem;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.legal-section p:last-child {
+  margin-bottom: 0;
 }
 
 .preview-modal {

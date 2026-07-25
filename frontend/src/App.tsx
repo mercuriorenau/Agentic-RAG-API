@@ -48,6 +48,7 @@ import { ThinkingReplay } from "./components/ThinkingReplay";
 import { TypewriterText } from "./components/TypewriterText";
 import { StackStrip } from "./components/StackStrip";
 import { AuthForm } from "./components/AuthForm";
+import { LegalNotice } from "./components/LegalNotice";
 import { ProfileLinks } from "./components/ProfileLinks";
 import {
   CHAT_HISTORY,
@@ -632,6 +633,9 @@ export default function App() {
             onResetPassword={handleResetPassword}
             onBackToLogin={handleBackToLogin}
           />
+          <p className="auth-legal muted">
+            Personal demo. By signing up you accept the <LegalNotice /> notice.
+          </p>
         </div>
         <StackStrip />
       </div>
