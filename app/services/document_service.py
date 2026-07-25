@@ -117,6 +117,9 @@ class DocumentService:
                 )
 
             document.status = "ready"
+            stem = Path(filename).stem.strip()
+            if chat.title in {"New chat", "Default chat"} and stem:
+                chat.title = stem[:200]
             logger.info(
                 "document_ingested",
                 document_id=str(document.id),

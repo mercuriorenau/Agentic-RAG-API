@@ -1,5 +1,5 @@
 import uuid
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -22,7 +22,8 @@ async def test_upload_and_ingest_txt(tmp_path) -> None:
     service = DocumentService(db, settings=settings, embedding_service=embedding_service)
     user = User(id=uuid.uuid4(), email="u@example.com", hashed_password="x")
     chat_id = uuid.uuid4()
-    service._get_owned_chat = AsyncMock(return_value=MagicMock(id=chat_id, user_id=user.id))
+    chat = MagicMock(id=chat_id, user_id=user.id, title="New chat")
+    service._get_owned_chat = AsyncMock(return_value=chat)
 
     document = await service.upload_and_ingest(
         user,
@@ -34,8 +35,71 @@ async def test_upload_and_ingest_txt(tmp_path) -> None:
 
     assert document.status == "ready"
     assert document.chat_id == chat_id
+    assert chat.title == "notes"
     assert db.add.call_count >= 2
     db.flush.assert_awaited()
+
+
+@pytest.mark.asyncio
+async def test_upload_renames_new_chat_from_pdf_stem(tmp_path) -> None:
+    db = AsyncMock()
+    settings = MagicMock()
+    settings.upload_dir = str(tmp_path / "uploads")
+    settings.chunk_size = 800
+    settings.chunk_overlap = 100
+
+    embedding_service = AsyncMock()
+    embedding_service.embed_texts.return_value = [[0.1] * 1536]
+
+    service = DocumentService(db, settings=settings, embedding_service=embedding_service)
+    user = User(id=uuid.uuid4(), email="u@example.com", hashed_password="x")
+    chat_id = uuid.uuid4()
+    chat = MagicMock(id=chat_id, user_id=user.id, title="New chat")
+    service._get_owned_chat = AsyncMock(return_value=chat)
+
+    # Bypass PDF parsing; we only assert the chat title uses the filename stem.
+    with patch("app.services.document_service.extract_pages", return_value=[(1, "lease text")]), patch(
+        "app.services.document_service.chunk_pages",
+        return_value=[MagicMock(page_number=1, content="lease text")],
+    ):
+        document = await service.upload_and_ingest(
+            user,
+            chat_id,
+            "New Mexico Lease Agreement.pdf",
+            "application/pdf",
+            b"%PDF fake",
+        )
+
+    assert document.status == "ready"
+    assert chat.title == "New Mexico Lease Agreement"
+
+
+@pytest.mark.asyncio
+async def test_upload_keeps_custom_chat_title(tmp_path) -> None:
+    db = AsyncMock()
+    settings = MagicMock()
+    settings.upload_dir = str(tmp_path / "uploads")
+    settings.chunk_size = 800
+    settings.chunk_overlap = 100
+
+    embedding_service = AsyncMock()
+    embedding_service.embed_texts.return_value = [[0.1] * 1536]
+
+    service = DocumentService(db, settings=settings, embedding_service=embedding_service)
+    user = User(id=uuid.uuid4(), email="u@example.com", hashed_password="x")
+    chat_id = uuid.uuid4()
+    chat = MagicMock(id=chat_id, user_id=user.id, title="My lease chat")
+    service._get_owned_chat = AsyncMock(return_value=chat)
+
+    await service.upload_and_ingest(
+        user,
+        chat_id,
+        "New Mexico Lease Agreement.txt",
+        "text/plain",
+        b"Our lease allows pets.",
+    )
+
+    assert chat.title == "My lease chat"
 
 
 @pytest.mark.asyncio

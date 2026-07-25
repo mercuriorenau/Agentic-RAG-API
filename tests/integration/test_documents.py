@@ -9,10 +9,43 @@ from tests.auth_helpers import register_verify_and_login
 async def _register_and_login(client: AsyncClient, email: str = "docuser@example.com") -> str:
     return await register_verify_and_login(client, email)
 
-async def _create_chat(client: AsyncClient, headers: dict[str, str]) -> str:
-    response = await client.post("/api/v1/chats", headers=headers, json={"title": "Test chat"})
+async def _create_chat(
+    client: AsyncClient, headers: dict[str, str], title: str = "Test chat"
+) -> str:
+    response = await client.post("/api/v1/chats", headers=headers, json={"title": title})
     assert response.status_code == 201
     return response.json()["id"]
+
+
+@pytest.mark.asyncio
+@patch("app.services.embedding_service.AsyncOpenAI")
+async def test_upload_renames_new_chat_from_filename(mock_openai_cls, client: AsyncClient) -> None:
+    mock_client = AsyncMock()
+    mock_openai_cls.return_value = mock_client
+    mock_client.embeddings.create.return_value = AsyncMock(data=[AsyncMock(embedding=[0.1] * 1536)])
+
+    token = await _register_and_login(client, email="renameupload@example.com")
+    headers = {"Authorization": f"Bearer {token}"}
+    chat_id = await _create_chat(client, headers, title="New chat")
+
+    upload_response = await client.post(
+        "/api/v1/documents",
+        headers=headers,
+        files={
+            "file": (
+                "New Mexico Lease Agreement.txt",
+                b"Our lease allows pets.",
+                "text/plain",
+            )
+        },
+        data={"chat_id": chat_id},
+    )
+    assert upload_response.status_code == 201
+
+    chats = await client.get("/api/v1/chats", headers=headers)
+    assert chats.status_code == 200
+    renamed = next(chat for chat in chats.json()["chats"] if chat["id"] == chat_id)
+    assert renamed["title"] == "New Mexico Lease Agreement"
 
 
 @pytest.mark.asyncio

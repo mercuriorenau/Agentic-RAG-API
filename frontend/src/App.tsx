@@ -436,6 +436,7 @@ export default function App() {
     try {
       await uploadDocument(activeChatId, file);
       setDocuments(await listDocuments(activeChatId));
+      await refreshChats(activeChatId);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Upload failed";
       if (isRateLimitMessage(message)) {
