@@ -804,8 +804,11 @@ export default function App() {
                 ) : (
                   <div className="chat-block active front-chat">
                     <div className="chat-row">
-                      <p className="chat-select front-chat-title" title={activeChat.title}>
-                        {activeChat.title}
+                      <p
+                        className="chat-select front-chat-title"
+                        data-tooltip={activeChat.title}
+                      >
+                        <span className="front-chat-title-text">{activeChat.title}</span>
                       </p>
                       {chats.length > 1 ? (
                         <button
