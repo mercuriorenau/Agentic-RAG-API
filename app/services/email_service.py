@@ -172,28 +172,79 @@ async def send_verification_email(
         "Hi,\n\n"
         "Thanks for trying Agentic RAG (my personal portfolio demo).\n\n"
         f"Your verification code is: {code}\n\n"
-        f"You can also open this link to verify:\n{verify_url}\n\n"
+        "Enter this code in the app, or open this link to verify:\n"
+        f"{verify_url}\n\n"
         f"This code expires in {expire_minutes} minutes.\n\n"
         "Thank you for reviewing my project. I hope you enjoy what I built.\n\n"
         "If you did not create an account, you can ignore this email.\n"
     )
     html_body = f"""\
 <html>
-  <body style="font-family: Georgia, 'Times New Roman', serif; color: #222; line-height: 1.5;">
-    <p>Hi,</p>
-    <p>Thanks for trying <strong>Agentic RAG</strong> (my personal portfolio demo).</p>
-    <p>Your verification code is:</p>
-    <p style="font-size:1.35rem;letter-spacing:0.12em;\
-font-weight:700;font-family:ui-monospace,monospace;">{code}</p>
-    <p>
-      Or verify with this link:<br/>
-      <a href="{verify_url}">{verify_url}</a>
-    </p>
-    <p>This code expires in {expire_minutes} minutes.</p>
-    <p>Thank you for reviewing my project. I hope you enjoy what I built.</p>
-    <p style="color:#666;font-size:0.92rem;">
-      If you did not create an account, you can ignore this email.
-    </p>
+  <body style="margin:0;padding:0;background:#f4f6f1;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" \
+style="background:#f4f6f1;padding:28px 12px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" \
+style="max-width:480px;background:#ffffff;border-radius:14px;padding:28px 24px;\
+font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;\
+color:#1a1f14;line-height:1.5;">
+            <tr>
+              <td style="font-size:12px;letter-spacing:0.08em;text-transform:uppercase;\
+color:#6b7560;font-weight:600;padding-bottom:14px;">Agentic RAG</td>
+            </tr>
+            <tr>
+              <td style="font-size:15px;padding-bottom:10px;">Hi,</td>
+            </tr>
+            <tr>
+              <td style="font-size:15px;padding-bottom:18px;">
+                Thanks for trying <strong>Agentic RAG</strong>, my personal portfolio demo.
+              </td>
+            </tr>
+            <tr>
+              <td style="font-size:14px;color:#4d5546;padding-bottom:8px;">
+                Your verification code
+              </td>
+            </tr>
+            <tr>
+              <td style="font-size:28px;letter-spacing:0.18em;font-weight:700;\
+font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;padding-bottom:12px;">
+                {code}
+              </td>
+            </tr>
+            <tr>
+              <td style="font-size:14px;color:#4d5546;padding-bottom:16px;">
+                Enter this code in the app, or click Continue to verify right away.
+              </td>
+            </tr>
+            <tr>
+              <td style="padding-bottom:18px;">
+                <a href="{verify_url}" \
+style="display:inline-block;background:#d8ff1a;color:#141a00;text-decoration:none;\
+font-weight:700;font-size:15px;padding:12px 22px;border-radius:999px;">
+                  Continue
+                </a>
+              </td>
+            </tr>
+            <tr>
+              <td style="font-size:13px;color:#6b7560;padding-bottom:16px;">
+                This code expires in {expire_minutes} minutes.
+              </td>
+            </tr>
+            <tr>
+              <td style="font-size:14px;padding-bottom:16px;">
+                Thank you for reviewing my project. I hope you enjoy what I built.
+              </td>
+            </tr>
+            <tr>
+              <td style="font-size:12px;color:#8a9380;">
+                If you did not create an account, you can ignore this email.
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
   </body>
 </html>
 """
