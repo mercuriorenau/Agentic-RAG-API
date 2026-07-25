@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 from app.core.config import Settings
 
-# Broad / survey-style questions that need more passages (still capped).
+# Broad / survey questions that need more passages (still capped).
 _BROAD_PATTERNS: tuple[re.Pattern[str], ...] = tuple(
     re.compile(pattern, re.IGNORECASE)
     for pattern in (

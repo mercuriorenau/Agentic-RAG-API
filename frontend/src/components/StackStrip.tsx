@@ -12,12 +12,14 @@ const STACK_ITEMS = [
   { name: "TypeScript", icon: "language" },
   { name: "Vite", icon: "build" },
   { name: "Google Auth", icon: "auth" },
+  { name: "Gmail SMTP", icon: "auth" },
+  { name: "SlowAPI", icon: "api" },
   { name: "Docker", icon: "container" },
 ] as const;
 
 type IconKind = (typeof STACK_ITEMS)[number]["icon"];
 
-/** Generic category icons — not brand logos. */
+/** Generic category icons, not brand logos. */
 function SemanticIcon({ kind }: { kind: IconKind }) {
   const props = {
     viewBox: "0 0 24 24",
@@ -168,7 +170,7 @@ export function StackStrip() {
         </ul>
       </div>
       <p className="stack-strip-note muted">
-        Tools used in this demo — not affiliated with or endorsed by these companies.
+        Tools used in this demo. Not affiliated with or endorsed by these companies.
       </p>
     </aside>
   );

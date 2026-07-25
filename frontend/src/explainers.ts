@@ -1,34 +1,35 @@
 import type { QueryResponse } from "./api";
 
-/** Edit these strings freely — the UI imports from this file only. */
+/** Edit these strings freely. The UI imports from this file only. */
 
 export const INTRO =
-  "Sign in with email or Google so uploads stay under your account (JWT sessions). " +
-  "Each chat only searches the documents you uploaded into that chat — never other threads.";
+  "Sign in with Google, or start an email signup that stays pending until you verify its " +
+  "link or 6-digit code. Password reset also requires an emailed code before anything changes. " +
+  "JWT sessions keep uploads under your account, and each chat only searches its own documents.";
 
 export const DOC_UPLOAD =
-  "On upload we extract text (page-aware for PDFs), split it into paragraph-aware " +
-  "overlapping chunks (~800 chars, 100 overlap), embed with text-embedding-3-small, " +
+  "On upload we extract text (with page numbers for PDFs), split it into overlapping " +
+  "paragraph chunks (~800 chars, 100 overlap), embed with text-embedding-3-small, " +
   "and store vectors in Postgres with pgvector. Ask uses hybrid search (dense + full-text), " +
-  "RRF fusion, a score floor, optional LLM rerank, and Self-RAG grade/rewrite — " +
-  "not a full re-read of every file.";
+  "RRF fusion, a score floor, optional LLM rerank, and Self-RAG grade/rewrite, " +
+  "not a full reread of every file.";
 
 export const RETRIEVAL_BUDGET =
   "Retrieval is adaptive but capped: focused questions use TOP_K (default 5); " +
   "broad ones (e.g. “each case”, “summarize the document”) may rise toward TOP_K_MAX " +
   "(default 8). That keeps demo token spend in check. Incomplete surveys of long PDFs " +
-  "are an intentional budget, not a broken index — ask one section at a time for detail.";
+  "are an intentional budget, not a broken index. Ask one section at a time for detail.";
 
-/** Visible in-app warning — keep in sync with TOP_K_MAX / chunk defaults. */
+/** Visible in-app warning. Keep in sync with TOP_K_MAX / chunk defaults. */
 export const DOC_SIZE_WARNING_TITLE = "Retrieval budget warning";
 
 export const DOC_SIZE_WARNING =
   "This demo retrieves at most ~8 passages per question (not the whole file) so API " +
   "tokens stay bounded. Best results: PDFs or notes under about 15 pages. Longer docs " +
-  "still work if you ask about one case or section at a time — incomplete “cover " +
+  "still work if you ask about one case or section at a time. Incomplete “cover " +
   "everything” answers are an intentional cost limit, not a bug.";
 
-export const COVERAGE_LIMIT_TITLE = "Partial coverage — demo retrieval limit";
+export const COVERAGE_LIMIT_TITLE = "Partial coverage (demo retrieval limit)";
 
 export function coverageNotice(
   response: QueryResponse,
@@ -41,7 +42,7 @@ export function coverageNotice(
     return null;
   }
 
-  // Only survey-style asks set budget_capped. Filling top_k on a focused question
+  // Only broad survey asks set budget_capped. Filling top_k on a focused question
   // (e.g. Caso 9 → 5/5) is normal and must NOT show this banner.
   const cappedAttempt = [...attempts]
     .reverse()
@@ -58,7 +59,7 @@ export function coverageNotice(
     cappedAttempt.chunk_count >= cappedAttempt.top_k;
 
   let body =
-    `This was a broad / survey-style question. Each search kept at most top_k=${topK} ` +
+    `This was a broad survey question. Each search kept at most top_k=${topK} ` +
     `passages (hard cap TOP_K_MAX=${maxK}), not the whole file. `;
   if (filled) {
     body +=
@@ -72,7 +73,7 @@ export function coverageNotice(
     body += `A fuller survey would want about top_k=${ideal}, but this demo caps retrieve to control API cost. `;
   }
   body +=
-    `That is an intentional limit — not a broken index. Ask about one case or section ` +
+    `That is an intentional limit, not a broken index. Ask about one case or section ` +
     `(e.g. “Caso 3 Lidl”) for detail the survey may have skipped.`;
 
   return { title: COVERAGE_LIMIT_TITLE, body };
@@ -84,14 +85,16 @@ export const MODEL_PICKER =
   "retrieve documents, Tavily web search, or answer directly.";
 
 export const COST_GUARDRAIL =
-  "Personal demo limits: 600 characters per question and 10 asks per visitor per day, " +
-  "plus the retrieval chunk cap above. This is my portfolio Agentic RAG project — " +
-  "those caps keep API costs reasonable for visitors.";
+  "Personal demo limits: 600 characters per question and 10 asks per visitor IP per day, " +
+  "plus the retrieval chunk cap above. After a 429, this tab also locks Ask and Upload " +
+  "for up to about 24 hours (or until you close the tab). Uploads are not separately " +
+  "rate-limited by the API. Owner emails configured on the server bypass the query limit. " +
+  "These safeguards keep API costs reasonable for visitors.";
 
 export const CONVERSATION_MEMORY =
-  "Follow-ups use the last few Q&A turns, so pronouns like \"he\" or \"that resume\" " +
-  "can refer to what you just discussed. Clear chat memory or start a fresh question " +
-  "for a clean slate.";
+  "Follow-ups use up to the last 6 Q&A turns from this chat, so pronouns like \"he\" or " +
+  "\"that resume\" can refer to what you just discussed. A new question in the same chat " +
+  "still sees that context; clear chat memory or start a New chat for a clean slate.";
 
 export const CHAT_SESSIONS =
   "The front of this card is your active workspace (title + documents). Use the U-turn " +
@@ -104,22 +107,24 @@ export const CHAT_HISTORY =
   "last workspace stays available.";
 
 export const CITATIONS =
-  "Each card is a source the model actually saw — a document chunk (with page when " +
-  "known) or a web snippet. The score reflects retrieval ranking after hybrid search " +
-  "and optional rerank (higher is stronger). Retrieval attempts may show adaptive top_k.";
+  "Each card is a source the model actually saw: a document chunk (with page when " +
+  "known) or a web snippet. The score is the hybrid channel similarity (dense or " +
+  "full-text) used before the final top_k cut; optional LLM rerank may change order " +
+  "without rewriting that score (higher is stronger). Retrieval attempts may show " +
+  "adaptive top_k.";
 
 export const AGENT_PATH =
   "Route is the path the agent took: retrieve (uploaded files), web, direct, or mixed. " +
   "The model badge is which LLM ran the agent loop (Auto or your lock). " +
-  "Tool chips count each tool call in that loop — retrieve_documents ×9 means nine " +
-  "separate searches, not nine models. The agent may search again with a new query " +
-  "when coverage looks thin.";
+  "Tool chips count calls in the agent loop. For example, Search uploads ×2 means two " +
+  "retrieve_documents calls, not two models. Self-RAG rewrite/retry passes inside one " +
+  "call appear in the retrieval log instead of the tool call count.";
 
 export const RETRIEVAL_ATTEMPTS =
   "This log is the search pipeline inside retrieve_documents. Hybrid search (vector + " +
   "full-text, fused with RRF) builds candidates; an optional LLM reranker reorders them; " +
   "then only top_k passages go to the agent. Self-RAG grades evidence as sufficient, " +
-  "partial, or irrelevant — if weak, it rewrites the query and searches again. " +
+  "partial, or irrelevant. If weak, it rewrites the query and searches again. " +
   "top_k is the adaptive budget for this question (capped for the demo). " +
   "Candidates are how many passages passed the score floor before the final cut.";
 
@@ -154,7 +159,7 @@ export function explainAnswer(response: QueryResponse): AnswerExplainer {
     );
   } else {
     paragraphs.push(
-      "No citations this time — usual for direct answers, or when retrieval/web returned nothing useful.",
+      "No citations this time. That is usual for direct answers, or when retrieval/web returned nothing useful.",
     );
   }
 
@@ -210,12 +215,12 @@ function retrievalWalkthrough(
       break;
     case "disabled":
       lines.push(
-        "Rerank: disabled for this deploy — the pipeline kept hybrid RRF order and sliced to top_k.",
+        "Rerank: disabled for this deploy. The pipeline kept hybrid RRF order and sliced to top_k.",
       );
       break;
     case "fail_open":
       lines.push(
-        "Rerank: enabled, but the reranker failed open — hybrid order was kept, then sliced to top_k so retrieve still returned passages.",
+        "Rerank: enabled, but the reranker failed open. Hybrid order was kept, then sliced to top_k so retrieve still returned passages.",
       );
       break;
     case "skipped":
@@ -247,8 +252,8 @@ function retrievalWalkthrough(
   ) {
     lines.push(
       `Budget note: this question would be better with about top_k=${last.ideal_top_k} ` +
-        `passages because it needs wider coverage, but the demo hard-capped retrieve at ` +
-        `top_k=${topK}. Ask one case/section at a time for detail the cap may have missed.`,
+        `passages because it needs wider coverage, but the demo capped retrieve at ` +
+        `top_k=${topK}. Ask one case or section at a time for detail the cap may have missed.`,
     );
   }
 
@@ -269,7 +274,7 @@ function routeParagraph(route: string): string {
       );
     case "mixed":
       return (
-        "This turn mixed sources — both document retrieval and web search ran before " +
+        "This turn mixed sources: both document retrieval and web search ran before " +
         "the final answer."
       );
     case "direct":

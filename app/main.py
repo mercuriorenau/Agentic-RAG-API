@@ -80,10 +80,11 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="Agentic RAG API",
         description=(
-            "Upload documents and ask questions. An agent routes between document "
-            "retrieval, web search, and direct answers, with citations."
+            "Verified users upload documents into isolated chat workspaces. An agent "
+            "routes each question through hybrid document retrieval, web search, or a "
+            "direct answer, with streamed progress, citations, and a Self-RAG trace."
         ),
-        version="0.2.0",
+        version="0.3.0",
         lifespan=lifespan,
     )
 

@@ -27,7 +27,7 @@ async def test_login_before_verify_returns_401(client: AsyncClient) -> None:
     assert register_response.status_code == 201
     assert register_response.json()["email_verified"] is False
 
-    # No users row until verified — login cannot succeed.
+    # No users row until verified; login cannot succeed.
     login_response = await client.post(
         "/api/v1/auth/login",
         json={"email": "pending@example.com", "password": "password123"},
@@ -68,7 +68,7 @@ async def test_verify_email_code_returns_token(client: AsyncClient) -> None:
 async def test_duplicate_register_returns_409(client: AsyncClient) -> None:
     payload = {"email": "dup@example.com", "password": "password123"}
     assert (await client.post("/api/v1/auth/register", json=payload)).status_code == 201
-    # Pending (unverified) signup can be refreshed — not a conflict.
+    # Pending (unverified) signup can be refreshed; not a conflict.
     assert (await client.post("/api/v1/auth/register", json=payload)).status_code == 201
     # After verify, further register attempts conflict.
     await client.post(

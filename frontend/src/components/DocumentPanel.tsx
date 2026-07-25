@@ -126,7 +126,7 @@ export function DocumentPanel({
           disabled={busy || rateLimited}
           title={
             rateLimited
-              ? `Upload locked — unlocks in ${lockCountdown}`
+              ? `Upload locked. Unlocks in ${lockCountdown}`
               : undefined
           }
           onClick={() => inputRef.current?.click()}

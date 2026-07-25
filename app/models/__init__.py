@@ -44,7 +44,7 @@ class User(Base):
 
 
 class PendingSignup(Base):
-    """Email/password signup held until verification — no real User row yet."""
+    """Email/password signup held until verification; no real User row yet."""
 
     __tablename__ = "pending_signups"
 

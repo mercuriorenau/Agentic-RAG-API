@@ -84,7 +84,7 @@ export function AgentPath({ route, modelProvider, modelName, toolsUsed }: Props)
         </div>
       ) : (
         <p className="muted agent-path-tools-empty">
-          No tools — the model answered without retrieve or web search.
+          No tools. The model answered without retrieve or web search.
         </p>
       )}
     </div>

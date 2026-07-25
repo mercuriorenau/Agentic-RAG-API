@@ -17,8 +17,13 @@ export function ThinkingReplay({ steps, open, onToggle }: Props) {
 
   return (
     <div className="thinking-replay">
-      <button type="button" className="thinking-replay-toggle linkish" onClick={onToggle}>
-        {open ? "Hide thinking ▾" : "Show thinking ▸"}
+      <button
+        type="button"
+        className="thinking-replay-toggle linkish"
+        title="Operational progress events from the agent, not private chain-of-thought"
+        onClick={onToggle}
+      >
+        {open ? "Hide agent steps ▾" : "Show agent steps ▸"}
       </button>
       {open ? (
         <ul className="busy-steps thinking-replay-list">

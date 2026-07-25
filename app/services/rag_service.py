@@ -160,7 +160,7 @@ class RAGService:
                 break
             if attempt_index >= max_attempts - 1 or not needs_retry(grade):
                 break
-            # Broad/capped surveys often grade "partial" even when top_k is full —
+            # Broad/capped surveys often grade "partial" even when top_k is full;
             # rewriting and searching again mostly repeats the same budget.
             if (
                 budget.capped

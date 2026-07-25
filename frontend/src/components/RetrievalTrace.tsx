@@ -24,9 +24,9 @@ function gradeBlurb(grade: string): string {
     case "sufficient":
       return "Self-RAG judged the passages strong enough to answer.";
     case "partial":
-      return "Self-RAG found some signal but coverage looked thin — may rewrite and retry.";
+      return "Self-RAG found some signal but coverage looked thin. It may rewrite and retry.";
     case "irrelevant":
-      return "Self-RAG found little useful evidence — usually rewrites the query and searches again.";
+      return "Self-RAG found little useful evidence. It usually rewrites the query and searches again.";
     default:
       return "Self-RAG evidence grade for this search pass.";
   }
@@ -37,9 +37,9 @@ function rerankBlurb(rerank: string | undefined): string {
     case "applied":
       return "LLM listwise rerank reordered candidates, then kept top_k.";
     case "disabled":
-      return "Rerank off — kept hybrid RRF order, then top_k.";
+      return "Rerank off. Kept hybrid RRF order, then top_k.";
     case "fail_open":
-      return "Rerank failed open — kept hybrid order, then top_k.";
+      return "Rerank failed open. Kept hybrid order, then top_k.";
     case "skipped":
       return "Rerank skipped (no candidates after the score floor).";
     default:
@@ -120,7 +120,7 @@ export function RetrievalTrace({ attempts }: Props) {
         Pipeline: hybrid search (dense vectors + full-text) → RRF fusion → optional
         rerank → keep top_k.
         {capped
-          ? ` This survey-style question would be better with about top_k=${last.ideal_top_k}, but the demo hard-capped retrieve at top_k=${last.top_k}.`
+          ? ` This broad survey question would be better with about top_k=${last.ideal_top_k}, but the demo capped retrieve at top_k=${last.top_k}.`
           : " Adaptive top_k stays inside the demo hard cap so token spend stays bounded."}
       </p>
     </div>

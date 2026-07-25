@@ -120,7 +120,7 @@ export function AuthForm({
         return;
       }
       if (password.length < PASSWORD_MIN || password.length > PASSWORD_MAX) {
-        setLocalError(`Password must be ${PASSWORD_MIN}–${PASSWORD_MAX} characters.`);
+        setLocalError(`Password must be ${PASSWORD_MIN} to ${PASSWORD_MAX} characters.`);
         return;
       }
       if (password !== confirmPassword) {
@@ -138,7 +138,7 @@ export function AuthForm({
 
     if (mode === "register") {
       if (password.length < PASSWORD_MIN || password.length > PASSWORD_MAX) {
-        setLocalError(`Password must be ${PASSWORD_MIN}–${PASSWORD_MAX} characters.`);
+        setLocalError(`Password must be ${PASSWORD_MIN} to ${PASSWORD_MAX} characters.`);
         return;
       }
       if (password !== confirmPassword) {
@@ -193,7 +193,7 @@ export function AuthForm({
         </p>
         <p className="muted auth-verify-copy">
           Nothing in your inbox? Check the <strong>spam</strong> or promotions
-          folder — this demo sends mail from a personal address, so filters
+          folder. This demo sends mail from a personal address, so filters
           sometimes flag it.
         </p>
         <form onSubmit={handleVerify} className="stack" noValidate>
@@ -336,7 +336,7 @@ export function AuthForm({
               <p className="form-info">{info}</p>
             ) : mode === "reset" ? (
               <p className="form-info">
-                Password must be {PASSWORD_MIN}–{PASSWORD_MAX} characters.
+                Password must be {PASSWORD_MIN} to {PASSWORD_MAX} characters.
               </p>
             ) : null}
           </div>
@@ -470,7 +470,7 @@ export function AuthForm({
             <p className="form-info">{info}</p>
           ) : mode === "register" ? (
             <p className="form-info">
-              Password must be {PASSWORD_MIN}–{PASSWORD_MAX} characters.
+              Password must be {PASSWORD_MIN} to {PASSWORD_MAX} characters.
             </p>
           ) : null}
         </div>

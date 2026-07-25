@@ -38,7 +38,7 @@ class AuthService:
                     status_code=status.HTTP_409_CONFLICT,
                     detail="Email already registered",
                 )
-            # Leftover unverified User from older flow — remove so email can pending-signup.
+            # Leftover unverified User from older flow; remove so email can pending-signup.
             await self.db.delete(existing_user)
             await self.db.flush()
 
@@ -104,7 +104,7 @@ class AuthService:
 
     async def upsert_google_user(self, *, email: str, google_sub: str) -> User:
         email = email.strip().lower()
-        # Drop any pending email signup for this address — Google verifies ownership.
+        # Drop any pending email signup for this address; Google verifies ownership.
         pending = await self._get_pending_by_email(email)
         if pending is not None:
             await self.db.delete(pending)

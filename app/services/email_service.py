@@ -111,7 +111,7 @@ async def send_verification_email(
         f"Your verification code is: {code}\n\n"
         f"You can also open this link to verify:\n{verify_url}\n\n"
         f"This code expires in {expire_minutes} minutes.\n\n"
-        "Thank you for reviewing my project — I hope you enjoy what I built.\n\n"
+        "Thank you for reviewing my project. I hope you enjoy what I built.\n\n"
         "If you did not create an account, you can ignore this email.\n"
     )
     html_body = f"""\
@@ -127,7 +127,7 @@ font-weight:700;font-family:ui-monospace,monospace;">{code}</p>
       <a href="{verify_url}">{verify_url}</a>
     </p>
     <p>This code expires in {expire_minutes} minutes.</p>
-    <p>Thank you for reviewing my project — I hope you enjoy what I built.</p>
+    <p>Thank you for reviewing my project. I hope you enjoy what I built.</p>
     <p style="color:#666;font-size:0.92rem;">
       If you did not create an account, you can ignore this email.
     </p>
@@ -157,8 +157,8 @@ async def send_password_reset_email(
         "We received a request to reset your Agentic RAG password.\n\n"
         f"Your reset code is: {code}\n\n"
         f"This code expires in {expire_minutes} minutes.\n\n"
-        "If you did not request a password reset, you can ignore this email — "
-        "your password will stay the same.\n"
+        "If you did not request a password reset, you can ignore this email. "
+        "Your password will stay the same.\n"
     )
     html_body = f"""\
 <html>
@@ -170,7 +170,7 @@ async def send_password_reset_email(
 font-weight:700;font-family:ui-monospace,monospace;">{code}</p>
     <p>This code expires in {expire_minutes} minutes.</p>
     <p style="color:#666;font-size:0.92rem;">
-      If you did not request a password reset, ignore this email — your password will stay the same.
+      If you did not request a password reset, ignore this email. Your password will stay the same.
     </p>
   </body>
 </html>

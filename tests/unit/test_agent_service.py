@@ -205,7 +205,7 @@ async def test_agent_honors_user_selected_anthropic_model() -> None:
 async def test_agent_includes_conversation_history() -> None:
     llm = AsyncMock()
     llm.chat_with_tools.return_value = ChatResult(
-        content="Yes — based on the resume we just discussed, he looks hireable.",
+        content="Yes. Based on the resume we just discussed, he looks hireable.",
         tool_calls=[],
     )
     service = AgentService(rag_service=MagicMock(), llm=llm)

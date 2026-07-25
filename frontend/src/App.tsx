@@ -213,8 +213,8 @@ export default function App() {
       return;
     }
     if (emailVerified === "1") {
+      // Link verify normally also sends auth_token (handled above). Keep this as a soft fallback.
       setPendingVerifyEmail(null);
-      setAuthInfo("Email verified. You can sign in now.");
       setError(null);
       window.history.replaceState({}, "", window.location.pathname);
     }
@@ -241,7 +241,7 @@ export default function App() {
         );
       })
       .catch(() => {
-        /* ignore — Ask still works; lock only clears for exempt owners */
+        /* ignore; Ask still works; lock only clears for exempt owners */
       });
   }, [authed]);
 
@@ -522,7 +522,7 @@ export default function App() {
       appendAskStep({
         id: `done-${Date.now()}`,
         title: "Done",
-        detail: "Answer ready — writing reply",
+        detail: "Answer ready. Writing reply.",
       });
       await Promise.race([
         new Promise<void>((resolve) => {
@@ -576,7 +576,7 @@ export default function App() {
   function finishFirstVisitFlow() {
     markTourComplete(userKey);
     setTourMode(null);
-    // After the invite/tour — not during it — nudge first-time users to create a chat.
+    // After the invite/tour (not during it), nudge first-time users to create a chat.
     if (!hasDismissedCreateNudge(userKey)) {
       setShowCreateNudge(true);
       setChatsFlipped(false);
@@ -615,7 +615,7 @@ export default function App() {
             </div>
             <h1>Ask your documents. Trace every answer.</h1>
             <p className="lede">
-              Upload files, then let an agent choose retrieval, web search, or a direct answer —
+              Upload files, then let an agent choose retrieval, web search, or a direct answer,
               with citations you can verify.
             </p>
             <ProfileLinks />
@@ -739,7 +739,7 @@ export default function App() {
                 {!activeChat ? (
                   <div className="chat-empty-prompt">
                     <p className="muted">
-                      No active chat. Create one here to upload documents and ask — no need to flip the card.
+                      No active chat. Create one here to upload documents and ask. No need to flip the card.
                     </p>
                     <button
                       type="button"
@@ -941,7 +941,7 @@ export default function App() {
               disabled={busy || rateLimited || !question.trim() || !activeChatId}
               title={
                 rateLimited
-                  ? `Query limit reached — unlocks in ${rateLimitCountdown}`
+                  ? `Query limit reached. Unlocks in ${rateLimitCountdown}`
                   : undefined
               }
             >
@@ -958,7 +958,7 @@ export default function App() {
               ) : busyKind === "ask" ? (
                 <>
                   <span className="busy-spinner busy-spinner-inline" aria-hidden="true" />
-                  {askHandoff ? "Done…" : "Thinking…"}
+                  {askHandoff ? "Done…" : "Running agent…"}
                 </>
               ) : (
                 "Ask"

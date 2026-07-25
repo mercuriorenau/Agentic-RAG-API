@@ -1,6 +1,6 @@
 [project]
 name = "agentic-rag-api"
-version = "0.2.0"
+version = "0.3.0"
 description = "Agentic RAG API with document retrieval, web search, and evals"
 requires-python = ">=3.12"
 dependencies = [

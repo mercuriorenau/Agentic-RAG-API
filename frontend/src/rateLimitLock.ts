@@ -1,5 +1,5 @@
 const STORAGE_KEY = "rag_query_lock_until";
-const LOCK_MS = 24 * 60 * 60 * 1000; // 24 hours — matches RATE_LIMIT_QUERY=10/day window
+const LOCK_MS = 24 * 60 * 60 * 1000; // 24h client lock in sessionStorage; server window is RATE_LIMIT_QUERY
 
 export function isRateLimitMessage(message: string): boolean {
   return (
@@ -63,10 +63,11 @@ export function formatLockCountdown(remainingMs: number): string {
 export function rateLimitBannerMessage(countdown?: string | null): string {
   const wait = countdown
     ? ` Unlocks in ${countdown}.`
-    : " Ask and upload unlock in about 24 hours.";
+    : " This tab unlocks Ask and Upload in about 24 hours, or sooner if you close it.";
   return (
-    "Personal demo limit — this is my portfolio Agentic RAG project (10 asks/day), " +
-    "so Ask/upload are capped to keep API costs reasonable for visitors." +
+    "Personal demo limit: 10 Ask requests per visitor IP per day. After a 429, " +
+    "this tab also locks Ask and Upload to keep the demo usable. " +
+    "Configured owner accounts are exempt." +
     wait
   );
 }

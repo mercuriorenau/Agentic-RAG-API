@@ -40,10 +40,10 @@ TOOL_SPECS: list[ToolSpec] = [
             "Use this when the answer likely depends on uploaded files. "
             "Prefer search queries that match the document language and concrete labels "
             "(e.g. 'Caso 1', company names) over abstract English paraphrases. "
-            "For broad surveys, one well-formed retrieve is usually enough — avoid "
-            "repeating near-duplicate searches in the same turn. "
+            "For broad surveys, one well-formed retrieve is usually enough; avoid "
+            "repeating near duplicate searches in the same turn. "
             "Retrieval returns a small adaptive budget of chunks (not the whole file) "
-            "to limit tokens — for long documents, prefer focused queries "
+            "to limit tokens. For long documents, prefer focused queries "
             "(one case/section) over 'list everything'. "
             "If it returns no relevant passages, tell the user the documents do not "
             "contain the answer instead of inventing document content."
@@ -81,8 +81,8 @@ TOOL_SPECS: list[ToolSpec] = [
         description=(
             "Signal that the question can be answered from general knowledge without "
             "document retrieval or web search. Do NOT use this when the chat has uploaded "
-            "documents and the user is asking about those files, cases, or passages — "
-            "use retrieve_documents instead."
+            "documents and the user is asking about those files, cases, or passages. "
+            "Use retrieve_documents instead."
         ),
         parameters={
             "type": "object",
@@ -133,7 +133,7 @@ async def _retrieve_documents(arguments: dict[str, Any], context: ToolContext) -
         return ToolResult(
             content=(
                 "Already retrieved for this effective query earlier in the turn. "
-                "Use the prior passages — do not call retrieve_documents again with a "
+                "Use the prior passages. Do not call retrieve_documents again with a "
                 "similar survey or duplicate query."
             )
         )
@@ -250,10 +250,10 @@ async def _retrieve_documents(arguments: dict[str, Any], context: ToolContext) -
         budget_note += "LLM listwise rerank reordered those candidates, then sliced to top_k. "
     elif rerank == "fail_open":
         budget_note += (
-            "Rerank was enabled but failed open — kept hybrid order, then sliced to top_k. "
+            "Rerank was enabled but failed open. Kept hybrid order, then sliced to top_k. "
         )
     elif rerank == "disabled":
-        budget_note += "Rerank was off — kept hybrid RRF order, then sliced to top_k. "
+        budget_note += "Rerank was off. Kept hybrid RRF order, then sliced to top_k. "
     budget_note += (
         "This demo intentionally does not load the entire document into the model. "
     )
@@ -266,14 +266,14 @@ async def _retrieve_documents(arguments: dict[str, Any], context: ToolContext) -
         budget_note += (
             f"This question would be better with about top_k={ideal_k} passages for fuller "
             f"coverage, but the demo capped retrieve at top_k={used_k}. "
-            "Start your user-facing answer with a short caveat that this survey may omit "
+            "Start your answer to the user with a short caveat that this survey may omit "
             "sections because of that demo cap (in the same language as the user's "
             "question), then list only what the passages support. "
         )
     if query_looks_broad(query):
         budget_note += (
-            "Broad questions may omit some sections — ask about one case or section "
-            "for fuller coverage. Incomplete survey answers are a token-cost limit, "
+            "Broad questions may omit some sections. Ask about one case or section "
+            "for fuller coverage. Incomplete survey answers are a token cost limit, "
             "not missing files."
         )
     else:

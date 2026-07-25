@@ -20,7 +20,7 @@ ProgressCallback = Callable[[str, str], Awaitable[None]]
 _TOOL_STEP_TITLES = {
     "retrieve_documents": "Search uploads",
     "web_search": "Web search",
-    "answer_directly": "Skip uploads",
+    "answer_directly": "Answer directly",
 }
 
 SYSTEM_PROMPT = (
@@ -31,24 +31,24 @@ SYSTEM_PROMPT = (
     "about the user's documents. Use web_search for current or external facts. "
     "Use answer_directly for greetings, simple definitions, or math that needs no sources. "
     "When this chat lists uploaded documents, treat phrases like 'the document', "
-    "'this file', 'the PDF', 'each case', or 'the upload' as referring to those files — "
+    "'this file', 'the PDF', 'each case', or 'the upload' as referring to those files: "
     "call retrieve_documents before answering. Do not ask which document if only one "
-    "ready file is listed. Do not answer document-content questions with no tool call. "
+    "ready file is listed. Do not answer document content questions with no tool call. "
     "For survey questions that ask about many cases/sections, prefer one "
-    "retrieve_documents call using the user's wording or document-language keywords. "
-    "At most one follow-up retrieve if the first return is empty or irrelevant — "
+    "retrieve_documents call using the user's wording or keywords in the document language. "
+    "At most one follow-up retrieve if the first return is empty or irrelevant; "
     "do not fan out many similar searches. "
     "After tool results arrive, produce a final answer. "
     "CRITICAL language rule: write the ENTIRE final answer in the language of the "
-    "user's latest question only — including coverage caveats and follow-up offers. "
+    "user's latest question only, including coverage caveats and follow-up offers. "
     "Do not follow the document language, citation language, or prior-turn language "
     "when choosing reply language. Example: English question → English answer even if "
     "the PDF and earlier chat turns are Spanish. "
     "When document or web context is provided, ground every factual claim in that context "
     "and do not invent unsupported facts, numbers, or document details. "
     "Retrieve returns only a small adaptive chunk budget (not the whole file) to control "
-    "token cost. If a survey-style answer is incomplete, say so and suggest asking about "
-    "one case or section at a time — that is an intentional demo limit, not missing files. "
+    "token cost. If a survey answer is incomplete, say so and suggest asking about "
+    "one case or section at a time. That is an intentional demo limit, not missing files. "
     "When the retrieval budget note says the demo capped top_k, open the answer with a "
     "one-sentence caveat that coverage may be partial for that reason. "
     "If retrieve_documents returns no relevant passages, say clearly that the uploaded "
@@ -58,7 +58,7 @@ SYSTEM_PROMPT = (
     "If context is insufficient, say you do not know. "
     "You may receive prior conversation turns. Resolve pronouns and follow-ups from that "
     "history (for example 'he', 'she', 'that resume', 'the person above'). "
-    "Prior turns may be in a different language — still answer the latest question in "
+    "Prior turns may be in a different language; still answer the latest question in "
     "that question's language. "
     "If a follow-up still needs facts from uploaded files, call retrieve_documents again "
     "with a clear search query; otherwise answer using the prior turns."
@@ -150,7 +150,7 @@ class AgentService:
         ready_docs = await _list_ready_documents(self.rag_service, user, chat_id)
         await emit(
             "Planning",
-            f"{selection.provider} / {selection.model} — retrieve, web, or direct",
+            f"{selection.provider} / {selection.model}: retrieve, web, or direct",
         )
         messages: list[ChatMessage] = [
             ChatMessage(
@@ -195,8 +195,8 @@ class AgentService:
                         documents=ready_docs,
                     )
                     await emit(
-                        "Nudge retrieve",
-                        "Model answered without tools — requiring a document search",
+                        "Verify uploads",
+                        "Initial answer skipped files. Requiring a document search",
                     )
                     messages.append(
                         ChatMessage(
@@ -257,7 +257,7 @@ class AgentService:
                 tool_detail = _tool_progress_detail(call.name, call.arguments)
                 await emit(tool_title, tool_detail)
                 tool_result = await execute_tool(call.name, call.arguments, context)
-                # Direct answers are one beat — skip the noisy "… done" follow-up.
+                # Direct answers are one beat; skip the noisy "… done" follow-up.
                 if call.name != "answer_directly":
                     await emit(
                         f"{tool_title} done",
@@ -279,7 +279,7 @@ class AgentService:
                     )
                 )
 
-        await emit("Writing answer", "Max tool rounds reached — finalizing")
+        await emit("Writing answer", "Max tool rounds reached. Finalizing")
         final = await llm.chat_with_tools(messages, tools=[])
         answer = (final.content or "").strip() or "I could not produce an answer."
         route = resolve_route(tools_used)

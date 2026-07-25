@@ -149,7 +149,7 @@ def _auto_select(question: str, settings: Settings) -> ModelSelection:
     if any(term in lowered for term in reasoning_terms):
         signals.append("reasoning or explanation wording")
 
-    # Prefer Claude for document/reasoning work when available — stronger multi-retrieve
+    # Prefer Claude for document/reasoning work when available; stronger multi-retrieve
     # behavior on survey questions. Keep OpenAI as default for lighter asks.
     wants_anthropic = document_grounded or any(term in lowered for term in reasoning_terms)
     if wants_anthropic and settings.anthropic_api_key:
