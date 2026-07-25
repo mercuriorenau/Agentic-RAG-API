@@ -270,7 +270,7 @@ async def _retrieve_documents(arguments: dict[str, Any], context: ToolContext) -
             "sections because of that demo cap (in the same language as the user's "
             "question), then list only what the passages support. "
         )
-    if query_looks_broad(query):
+    if query_looks_broad(budget_question):
         budget_note += (
             "Broad questions may omit some sections. Ask about one case or section "
             "for fuller coverage. Incomplete survey answers are a token cost limit, "
@@ -278,6 +278,8 @@ async def _retrieve_documents(arguments: dict[str, Any], context: ToolContext) -
         )
     else:
         budget_note += (
+            "This was a focused question, not a capped survey. Answer from the passages "
+            "directly. Do not open with a partial-coverage or 'cobertura parcial' caveat. "
             "If a detail is missing, ask a narrower follow-up about that section."
         )
     blocks.append(budget_note)

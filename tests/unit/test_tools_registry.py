@@ -127,10 +127,56 @@ async def test_retrieve_rewrites_uuid_filename_in_citations() -> None:
     result = await execute_tool(
         "retrieve_documents",
         {"query": "refund"},
-        ToolContext(user=MagicMock(), rag_service=rag),
+        ToolContext(user=MagicMock(), rag_service=rag, user_question="What is the refund policy?"),
     )
     assert result.citations[0].document_name == "Uploaded PDF"
     assert "Uploaded PDF" in result.content
+    assert "Do not open with a partial-coverage" in result.content
+    assert "Start your answer to the user with a short caveat" not in result.content
+
+
+@pytest.mark.asyncio
+async def test_retrieve_survey_cap_asks_for_coverage_caveat() -> None:
+    chunk = MagicMock()
+    chunk.id = "chunk-1"
+    chunk.chunk_index = 0
+    chunk.page_number = None
+    chunk.content = "Caso 1 text"
+    document = MagicMock()
+    document.id = "doc-1"
+    document.filename = "casos.pdf"
+    item = MagicMock(chunk=chunk, document=document, score=0.8)
+    rag = AsyncMock()
+    rag.settings = Settings(openai_api_key="test", top_k=5, top_k_max=8, adaptive_top_k=True)
+    rag.retrieve.return_value = RetrievalResult(
+        chunks=[item],
+        trace=RetrievalTrace(
+            attempts=[
+                RetrievalAttempt(
+                    query="resume todos los casos del documento",
+                    grade="partial",
+                    chunk_count=8,
+                    top_k=8,
+                    top_k_max=8,
+                    ideal_top_k=16,
+                    budget_capped=True,
+                )
+            ],
+            final_query="resume todos los casos del documento",
+            top_k=8,
+        ),
+    )
+    result = await execute_tool(
+        "retrieve_documents",
+        {"query": "all cases"},
+        ToolContext(
+            user=MagicMock(),
+            rag_service=rag,
+            user_question="resume todos los casos del documento",
+        ),
+    )
+    assert "Start your answer to the user with a short caveat" in result.content
+    assert "Do not open with a partial-coverage" not in result.content
 
 
 @pytest.mark.asyncio

@@ -58,9 +58,15 @@ async def test_upload_renames_new_chat_from_pdf_stem(tmp_path) -> None:
     service._get_owned_chat = AsyncMock(return_value=chat)
 
     # Bypass PDF parsing; we only assert the chat title uses the filename stem.
-    with patch("app.services.document_service.extract_pages", return_value=[(1, "lease text")]), patch(
-        "app.services.document_service.chunk_pages",
-        return_value=[MagicMock(page_number=1, content="lease text")],
+    with (
+        patch(
+            "app.services.document_service.extract_pages",
+            return_value=[(1, "lease text")],
+        ),
+        patch(
+            "app.services.document_service.chunk_pages",
+            return_value=[MagicMock(page_number=1, content="lease text")],
+        ),
     ):
         document = await service.upload_and_ingest(
             user,
