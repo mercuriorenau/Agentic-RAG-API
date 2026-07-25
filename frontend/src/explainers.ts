@@ -85,9 +85,10 @@ export const MODEL_PICKER =
   "retrieve documents, Tavily web search, or answer directly.";
 
 export const COST_GUARDRAIL =
-  "Personal demo limits: 600 characters per question and 10 asks per visitor IP per day, " +
-  "plus the retrieval chunk cap above. After a 429, this tab also locks Ask and Upload " +
-  "for up to about 24 hours (or until you close the tab). Uploads are not separately " +
+  "Personal demo limits: 600 characters per question and 10 asks per account per day, " +
+  "plus the retrieval chunk cap above. After a too many requests (429) response, this tab " +
+  "also locks Ask and Upload for up to about 24 hours (or until you close the tab). Uploads " +
+  "are not separately " +
   "rate-limited by the API. Owner emails configured on the server bypass the query limit. " +
   "These safeguards keep API costs reasonable for visitors.";
 

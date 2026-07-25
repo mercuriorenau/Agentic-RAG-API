@@ -1,6 +1,10 @@
 from unittest.mock import MagicMock
 
-from app.core.rate_limit import query_rate_limit_exempt, user_is_rate_limit_exempt
+from app.core.rate_limit import (
+    query_rate_limit_exempt,
+    query_rate_limit_key,
+    user_is_rate_limit_exempt,
+)
 from app.core.security import create_access_token
 
 
@@ -40,4 +44,17 @@ def test_query_rate_limit_exempt_from_jwt_email(monkeypatch) -> None:
     other = create_access_token("x", email="nope@example.com")
     request.headers = {"Authorization": f"Bearer {other}"}
     assert query_rate_limit_exempt(request) is False
+    get_settings.cache_clear()
+
+
+def test_query_rate_limit_key_uses_user_subject(monkeypatch) -> None:
+    monkeypatch.setenv("SECRET_KEY", "test-secret-key")
+    from app.core.config import get_settings
+
+    get_settings.cache_clear()
+    token = create_access_token("user-123", email="visitor@example.com")
+    request = MagicMock()
+    request.headers = {"Authorization": f"Bearer {token}"}
+    request.client = MagicMock(host="9.9.9.9")
+    assert query_rate_limit_key(request) == "user:user-123"
     get_settings.cache_clear()

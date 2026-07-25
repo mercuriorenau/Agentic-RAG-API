@@ -56,7 +56,7 @@ export const LEGAL_SECTIONS: LegalSection[] = [
   {
     heading: "Fair use limits",
     paragraphs: [
-      "Questions are capped in length, and asks are limited per visitor per day so API " +
+      "Questions are capped in length, and asks are limited per account per day so API " +
         "costs stay reasonable. Hitting the limit is expected behavior, not a failure.",
       "Please do not use this demo for automated scraping, load testing, or anything " +
         "abusive or unlawful.",

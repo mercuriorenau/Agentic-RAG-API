@@ -108,7 +108,9 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [authInfo, setAuthInfo] = useState<string | null>(null);
   const [pendingVerifyEmail, setPendingVerifyEmail] = useState<string | null>(null);
-  const [rateLimitUntil, setRateLimitUntil] = useState<number | null>(() => readLockUntil());
+  const [rateLimitUntil, setRateLimitUntil] = useState<number | null>(() =>
+    readLockUntil(getUserKey()),
+  );
   const [lockNow, setLockNow] = useState(() => Date.now());
   const askCaughtUpRef = useRef<(() => void) | null>(null);
   const [userKey, setUserKey] = useState(getUserKey());
@@ -124,7 +126,7 @@ export default function App() {
     : null;
 
   function applyRateLimitLock(_message?: string) {
-    const until = engageRateLimitLock();
+    const until = engageRateLimitLock(userKey);
     setRateLimitUntil(until);
     setLockNow(Date.now());
     setError(rateLimitBannerMessage(formatLockCountdown(until - Date.now())));
@@ -254,7 +256,7 @@ export default function App() {
         if (!me.rate_limit_exempt) {
           return;
         }
-        clearRateLimitLock();
+        clearRateLimitLock(userKey);
         setRateLimitUntil(null);
         setError((current) =>
           current && isRateLimitMessage(current) ? null : current,
@@ -264,6 +266,12 @@ export default function App() {
         /* ignore; Ask still works; lock only clears for exempt owners */
       });
   }, [authed]);
+
+  useEffect(() => {
+    // Re-evaluate the client lock for the current account (e.g. after switching
+    // accounts in the same tab). The lock is stored per account.
+    setRateLimitUntil(readLockUntil(userKey));
+  }, [userKey]);
 
   useEffect(() => {
     if (!authed || !userKey || hasCompletedTour(userKey)) {

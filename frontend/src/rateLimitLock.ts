@@ -1,5 +1,19 @@
-const STORAGE_KEY = "rag_query_lock_until";
-const LOCK_MS = 24 * 60 * 60 * 1000; // 24h client lock in sessionStorage; server window is RATE_LIMIT_QUERY
+const STORAGE_PREFIX = "rag_query_lock_until";
+const LOCK_MS = 24 * 60 * 60 * 1000; // 24h client lock; server window is RATE_LIMIT_QUERY
+
+function lockKey(userKey: string | null | undefined): string {
+  return userKey ? `${STORAGE_PREFIX}:${userKey.toLowerCase()}` : STORAGE_PREFIX;
+}
+
+// Signed-in accounts lock in localStorage so the block follows the account
+// across tabs; anonymous visitors fall back to per-tab sessionStorage.
+function lockStore(userKey: string | null | undefined): Storage | null {
+  try {
+    return userKey ? window.localStorage : window.sessionStorage;
+  } catch {
+    return null;
+  }
+}
 
 export function isRateLimitMessage(message: string): boolean {
   return (
@@ -10,18 +24,22 @@ export function isRateLimitMessage(message: string): boolean {
   );
 }
 
-export function readLockUntil(): number | null {
+export function readLockUntil(userKey: string | null | undefined): number | null {
   if (typeof window === "undefined") {
     return null;
   }
+  const store = lockStore(userKey);
+  if (!store) {
+    return null;
+  }
   try {
-    const raw = window.sessionStorage.getItem(STORAGE_KEY);
+    const raw = store.getItem(lockKey(userKey));
     if (!raw) {
       return null;
     }
     const until = Number(raw);
     if (!Number.isFinite(until) || until <= Date.now()) {
-      window.sessionStorage.removeItem(STORAGE_KEY);
+      store.removeItem(lockKey(userKey));
       return null;
     }
     return until;
@@ -31,19 +49,19 @@ export function readLockUntil(): number | null {
 }
 
 /** Start (or refresh) a 24-hour client lockout after a rate-limit response. */
-export function engageRateLimitLock(): number {
+export function engageRateLimitLock(userKey: string | null | undefined): number {
   const until = Date.now() + LOCK_MS;
   try {
-    window.sessionStorage.setItem(STORAGE_KEY, String(until));
+    lockStore(userKey)?.setItem(lockKey(userKey), String(until));
   } catch {
     /* ignore */
   }
   return until;
 }
 
-export function clearRateLimitLock(): void {
+export function clearRateLimitLock(userKey: string | null | undefined): void {
   try {
-    window.sessionStorage.removeItem(STORAGE_KEY);
+    lockStore(userKey)?.removeItem(lockKey(userKey));
   } catch {
     /* ignore */
   }
@@ -63,10 +81,10 @@ export function formatLockCountdown(remainingMs: number): string {
 export function rateLimitBannerMessage(countdown?: string | null): string {
   const wait = countdown
     ? ` Unlocks in ${countdown}.`
-    : " This tab unlocks Ask and Upload in about 24 hours, or sooner if you close it.";
+    : " Ask and Upload unlock in about 24 hours.";
   return (
-    "Personal demo limit: 10 Ask requests per visitor IP per day. After a 429, " +
-    "this tab also locks Ask and Upload to keep the demo usable. " +
+    "Personal demo limit: 10 Ask requests per account per day. After a too many requests " +
+    "(429) response, this account locks Ask and Upload to keep the demo usable. " +
     "Configured owner accounts are exempt." +
     wait
   );

@@ -88,7 +88,7 @@ Each chat owns its own documents and message history. Retrieval only searches do
 
 Available models are exposed at `GET /api/v1/models`. The UI dropdown only shows providers whose API keys are configured.
 
-The query endpoints are rate limited and cap question length on purpose. The default is 10 Ask requests per visitor IP per day. After a 429, the UI also locks Ask and Upload in that tab for up to about 24 hours (sessionStorage; closing the tab clears the lock). Uploads are not independently rate-limited by the API. Emails in `RATE_LIMIT_BYPASS_EMAILS` bypass the query limit.
+The query endpoints are rate limited and cap question length on purpose. The default is 10 Ask requests per signed-in account per day. After a too many requests (429) response, the UI also locks Ask and Upload in that tab for up to about 24 hours (sessionStorage; closing the tab clears the lock). Uploads are not independently rate-limited by the API. Emails in `RATE_LIMIT_BYPASS_EMAILS` bypass the query limit.
 
 ## Local setup
 
