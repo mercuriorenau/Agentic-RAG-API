@@ -34,7 +34,14 @@ def _from_header(settings: Settings) -> str:
     return address
 
 
-def _send_smtp(*, settings: Settings, to_email: str, subject: str, text_body: str, html_body: str) -> None:
+def _send_smtp(
+    *,
+    settings: Settings,
+    to_email: str,
+    subject: str,
+    text_body: str,
+    html_body: str,
+) -> None:
     from_address = _from_address(settings)
     message = MIMEMultipart("alternative")
     message["Subject"] = subject
@@ -113,7 +120,8 @@ async def send_verification_email(
     <p>Hi,</p>
     <p>Thanks for trying <strong>Agentic RAG</strong> (my personal portfolio demo).</p>
     <p>Your verification code is:</p>
-    <p style="font-size:1.35rem;letter-spacing:0.12em;font-weight:700;font-family:ui-monospace,monospace;">{code}</p>
+    <p style="font-size:1.35rem;letter-spacing:0.12em;\
+font-weight:700;font-family:ui-monospace,monospace;">{code}</p>
     <p>
       Or verify with this link:<br/>
       <a href="{verify_url}">{verify_url}</a>
@@ -158,7 +166,8 @@ async def send_password_reset_email(
     <p>Hi,</p>
     <p>We received a request to reset your <strong>Agentic RAG</strong> password.</p>
     <p>Your reset code is:</p>
-    <p style="font-size:1.35rem;letter-spacing:0.12em;font-weight:700;font-family:ui-monospace,monospace;">{code}</p>
+    <p style="font-size:1.35rem;letter-spacing:0.12em;\
+font-weight:700;font-family:ui-monospace,monospace;">{code}</p>
     <p>This code expires in {expire_minutes} minutes.</p>
     <p style="color:#666;font-size:0.92rem;">
       If you did not request a password reset, ignore this email — your password will stay the same.

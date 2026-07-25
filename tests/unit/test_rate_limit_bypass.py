@@ -37,6 +37,7 @@ def test_query_rate_limit_exempt_from_jwt_email(monkeypatch) -> None:
     request.headers = {"Authorization": f"Bearer {token}"}
     assert query_rate_limit_exempt(request) is True
 
-    request.headers = {"Authorization": f"Bearer {create_access_token('x', email='nope@example.com')}"}
+    other = create_access_token("x", email="nope@example.com")
+    request.headers = {"Authorization": f"Bearer {other}"}
     assert query_rate_limit_exempt(request) is False
     get_settings.cache_clear()

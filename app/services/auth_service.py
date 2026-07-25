@@ -95,7 +95,10 @@ class AuthService:
         if not user.email_verified:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Please verify your email before signing in. Check your inbox for the link or code.",
+                detail=(
+                    "Please verify your email before signing in. "
+                    "Check your inbox for the link or code."
+                ),
             )
         return user
 
