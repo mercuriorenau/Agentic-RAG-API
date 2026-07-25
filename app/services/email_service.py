@@ -270,22 +270,65 @@ async def send_password_reset_email(
         "Hi,\n\n"
         "We received a request to reset your Agentic RAG password.\n\n"
         f"Your reset code is: {code}\n\n"
+        "Enter this code in the app to choose a new password.\n\n"
         f"This code expires in {expire_minutes} minutes.\n\n"
         "If you did not request a password reset, you can ignore this email. "
         "Your password will stay the same.\n"
     )
     html_body = f"""\
 <html>
-  <body style="font-family: Georgia, 'Times New Roman', serif; color: #222; line-height: 1.5;">
-    <p>Hi,</p>
-    <p>We received a request to reset your <strong>Agentic RAG</strong> password.</p>
-    <p>Your reset code is:</p>
-    <p style="font-size:1.35rem;letter-spacing:0.12em;\
-font-weight:700;font-family:ui-monospace,monospace;">{code}</p>
-    <p>This code expires in {expire_minutes} minutes.</p>
-    <p style="color:#666;font-size:0.92rem;">
-      If you did not request a password reset, ignore this email. Your password will stay the same.
-    </p>
+  <body style="margin:0;padding:0;background:#f4f6f1;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" \
+style="background:#f4f6f1;padding:28px 12px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" \
+style="max-width:480px;background:#ffffff;border-radius:14px;padding:28px 24px;\
+font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;\
+color:#1a1f14;line-height:1.5;">
+            <tr>
+              <td style="font-size:12px;letter-spacing:0.08em;text-transform:uppercase;\
+color:#6b7560;font-weight:600;padding-bottom:14px;">Agentic RAG</td>
+            </tr>
+            <tr>
+              <td style="font-size:15px;padding-bottom:10px;">Hi,</td>
+            </tr>
+            <tr>
+              <td style="font-size:15px;padding-bottom:18px;">
+                We received a request to reset your <strong>Agentic RAG</strong> password.
+              </td>
+            </tr>
+            <tr>
+              <td style="font-size:14px;color:#4d5546;padding-bottom:8px;">
+                Your reset code
+              </td>
+            </tr>
+            <tr>
+              <td style="font-size:28px;letter-spacing:0.18em;font-weight:700;\
+font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;padding-bottom:12px;">
+                {code}
+              </td>
+            </tr>
+            <tr>
+              <td style="font-size:14px;color:#4d5546;padding-bottom:18px;">
+                Enter this code in the app to choose a new password.
+              </td>
+            </tr>
+            <tr>
+              <td style="font-size:13px;color:#6b7560;padding-bottom:16px;">
+                This code expires in {expire_minutes} minutes.
+              </td>
+            </tr>
+            <tr>
+              <td style="font-size:12px;color:#8a9380;">
+                If you did not request a password reset, ignore this email.
+                Your password will stay the same.
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
   </body>
 </html>
 """
