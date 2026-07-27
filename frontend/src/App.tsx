@@ -1127,9 +1127,9 @@ export default function App() {
                       className="answer"
                       text={turn.response.answer}
                       active={isFresh}
-                      charsPerTick={1}
-                      tickMs={16}
-                      delayMs={380}
+                      charsPerTick={2}
+                      tickMs={14}
+                      delayMs={200}
                     />
                     <Citations citations={turn.response.citations} />
                     <RetrievalTrace attempts={turn.response.retrieval_trace} />
