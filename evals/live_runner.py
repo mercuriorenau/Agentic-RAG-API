@@ -108,6 +108,8 @@ async def _evaluate_live_case(
                 "route": 1.0,
                 "mode": "live",
                 "retrieved_count": len(retrieved_texts),
+                # No answer/context to judge — empty retrieve is the assertion.
+                "_skip_judge": True,
             }
 
         run_agent = (

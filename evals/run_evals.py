@@ -46,6 +46,8 @@ def evaluate_case(case: dict) -> dict:
         route_ok = True
 
     passed = groundedness_ok and relevance_ok and route_ok
+    # Empty-retrieve / low-groundedness cases are not answer-judge targets.
+    skip_judge = expect_low or bool(case.get("expect_empty_retrieve"))
     return {
         "id": case["id"],
         "passed": passed,
@@ -56,6 +58,7 @@ def evaluate_case(case: dict) -> dict:
         "_answer": answer,
         "_context": context,
         "_expect_low": expect_low,
+        "_skip_judge": skip_judge,
     }
 
 
@@ -65,7 +68,7 @@ async def _attach_judge_scores(results: list[dict]) -> list[dict]:
     enriched: list[dict] = []
     for item in results:
         row = {k: v for k, v in item.items() if not k.startswith("_")}
-        if item.get("_expect_low"):
+        if item.get("_expect_low") or item.get("_skip_judge"):
             row["faithfulness"] = None
             row["answer_relevance"] = None
             enriched.append(row)
