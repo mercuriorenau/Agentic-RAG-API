@@ -324,6 +324,17 @@ button.danger {
   text-transform: uppercase;
   font-size: 0.85rem;
   color: var(--accent);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.brand-logo {
+  width: 1.75rem;
+  height: 1.75rem;
+  object-fit: contain;
+  border-radius: 0.35rem;
+  flex-shrink: 0;
 }
 
 .hero h1 {
@@ -569,6 +580,20 @@ button.danger {
   line-height: 1;
   display: inline-flex;
   align-items: center;
+}
+
+.auth-hero .brand-logo {
+  width: 1.9rem;
+  height: 1.9rem;
+}
+
+.topbar .brand {
+  margin-bottom: 0.35rem;
+}
+
+.topbar .brand-logo {
+  width: 1.65rem;
+  height: 1.65rem;
 }
 
 .auth-hero .tech-note {

@@ -680,7 +680,10 @@ export default function App() {
         <div className="auth-screen-inner">
           <header className="hero auth-hero">
             <div className="label-with-note">
-              <p className="brand">Agentic RAG</p>
+              <p className="brand">
+                <img className="brand-logo" src="/logo.png" alt="" width={28} height={28} />
+                Agentic RAG
+              </p>
               <Explainer summary="About this demo">{INTRO}</Explainer>
             </div>
             <h1>Ask your documents. Trace every answer.</h1>
@@ -715,7 +718,10 @@ export default function App() {
     <div className="shell workspace">
       <header className="topbar">
         <div>
-          <p className="brand">Agentic RAG</p>
+          <p className="brand">
+            <img className="brand-logo" src="/logo.png" alt="" width={28} height={28} />
+            Agentic RAG
+          </p>
           <p className="muted">Separate chats, each with its own documents</p>
         </div>
         <div className="topbar-actions">
