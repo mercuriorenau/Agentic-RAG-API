@@ -2,10 +2,9 @@
 
 Upload documents into isolated chats and ask questions. An agent chooses hybrid retrieval, web search, or a direct answer, then streams a traceable reply with citations.
 
-<!-- Add docs/demo.gif yourself (screen recording of the live UI). -->
 ![Agentic RAG demo](docs/demo.gif)
 
-*Demo flow: upload → ask → agent route + citations (~30–45s).*
+*Demo flow: upload → ask → agent route + citations.*
 
 [![Python](https://img.shields.io/badge/Python-3.12-blue.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-async-009688.svg)](https://fastapi.tiangolo.com/)
@@ -23,7 +22,7 @@ This is a **personal educational demo**, not a production SaaS. The goal is to m
 **What you can learn by clicking around**
 
 - How an agent decides among `retrieve_documents`, `web_search`, and `answer_directly`
-- Hybrid search (dense vectors + full-text), RRF fusion, optional rerank, and Self-RAG retries
+- Hybrid search (dense vectors + full-text), RRF fusion, optional LLM rerank, and Self-RAG retries
 - Why survey questions get partial coverage under a hard `top_k` cap (design, not a broken index)
 - Auth and ops choices that show up in a real deploy (email verify, rate limits, ephemeral disk)
 
@@ -32,7 +31,7 @@ This is a **personal educational demo**, not a production SaaS. The goal is to m
 **Auth**
 
 - Email/password signup held until verification (link or 6-digit code)
-- Brevo HTTPS email on Railway; optional Gmail SMTP locally
+- Prefer Brevo HTTPS email (needed on Railway Hobby, where outbound SMTP is blocked); optional SMTP locally (e.g. Gmail App Password)
 - Google OAuth (treated as verified)
 - Password reset via emailed code (password unchanged until confirmed)
 - JWT sessions
@@ -45,8 +44,9 @@ This is a **personal educational demo**, not a production SaaS. The goal is to m
 
 **Agent and RAG**
 
-- Tool-calling agent (OpenAI and/or Anthropic)
-- Hybrid retrieve → RRF → optional LLM rerank → Self-RAG grade/rewrite
+- Tool-calling agent (OpenAI and/or Anthropic for chat)
+- Dense ingest/retrieve uses OpenAI embeddings (`text-embedding-3-small`) — required even if Anthropic is the chat model
+- Hybrid retrieve → RRF → optional listwise LLM rerank → Self-RAG grade/rewrite
 - Adaptive `top_k` with a hard demo cap (`TOP_K_MAX`, default 8)
 - Optional Tavily web search
 - Auto model mode picks a provider from simple question heuristics
@@ -54,7 +54,7 @@ This is a **personal educational demo**, not a production SaaS. The goal is to m
 **UI transparency**
 
 - Streaming agent steps (ops progress, not private chain-of-thought)
-- Collapsible citations and retrieval trace
+- Collapsible citations; retrieval trace when retrieve ran
 - Enter to send, Shift+Enter for a new line
 - First-visit walkthrough; completion stored per account (`onboarded`)
 - Dashed **i** notes next to upload, models, memory, citations, and budget
@@ -62,10 +62,10 @@ This is a **personal educational demo**, not a production SaaS. The goal is to m
 **Ops**
 
 - Docker Compose locally; Railway-friendly Dockerfile + migrations on boot
-- Ask rate limit per signed-in account (default `10/day`); client lock after a 429
+- Ask rate limit per signed-in account (default `10/day`); after a 429 the UI also locks Ask/Upload for that account on the client
 - Question length cap; upload size cap
 - Offline + optional live evals under `evals/`
-- GitHub Actions CI (lint, pytest, frontend build)
+- GitHub Actions CI: ruff, pytest with **80%** coverage gate on `app`, frontend build (**141** tests collected)
 
 ## Architecture
 
@@ -81,6 +81,7 @@ flowchart TB
   Direct[answer_directly]
   PG[(PostgreSQL_pgvector)]
   LLM[OpenAI_or_Anthropic]
+  Embed[OpenAI_embeddings]
   Tavily[Tavily]
 
   UI -->|signup_login_upload_ask| API
@@ -92,14 +93,15 @@ flowchart TB
   Agent --> Web
   Agent --> Direct
   Retrieve --> PG
+  Retrieve --> Embed
   Web --> Tavily
 ```
 
-**Ingestion:** upload → extract text (page numbers on PDFs when available) → overlapping paragraph chunks (`CHUNK_SIZE` / `CHUNK_OVERLAP`) → embed (`text-embedding-3-small`) → store in PostgreSQL with pgvector. Re-upload after changing chunk settings so old files pick up the new strategy.
+**Ingestion:** upload → extract text (page numbers on PDFs when available) → overlapping paragraph chunks (`CHUNK_SIZE` / `CHUNK_OVERLAP`, defaults 800 / 100) → embed (`text-embedding-3-small`) → store in PostgreSQL with pgvector. Re-upload after changing chunk settings so old files pick up the new strategy.
 
-**Retrieval:** dense (pgvector) + Postgres full-text → Reciprocal Rank Fusion → score floor → optional listwise LLM rerank → Self-RAG may grade evidence and rewrite/retry (up to `SELF_RAG_MAX_RETRIES`). Broad questions may raise `top_k` toward `TOP_K_MAX`; the agent still does not load the whole PDF.
+**Retrieval:** dense (pgvector) + Postgres full-text → Reciprocal Rank Fusion → score floor → optional listwise LLM rerank → Self-RAG may grade evidence and rewrite/retry (up to `SELF_RAG_MAX_RETRIES`). Broad questions may raise `top_k` toward `TOP_K_MAX`; the agent still does not load the whole PDF. Rerank and Self-RAG call OpenAI; if that path fails they degrade gracefully (rerank fail-open; Self-RAG may skip rewrite).
 
-**Query:** the selected model calls tools as needed, then returns an answer with citations, optional `retrieval_trace`, and a `route` (`retrieve` | `web` | `direct` | `mixed`). Empty retrieve means no document citations; the agent is instructed not to invent file content.
+**Query:** the selected chat model calls tools as needed, then returns an answer with citations, optional `retrieval_trace`, and a `route` (`retrieve` | `web` | `direct` | `mixed`). Empty retrieve means no document citations; the agent is instructed not to invent file content.
 
 ## Live demo
 
@@ -107,20 +109,21 @@ Open **[https://mercurio-agentic-rag.up.railway.app/](https://mercurio-agentic-r
 
 Caveats (intentional for a public portfolio demo):
 
-- Needs at least one LLM key on the server (`OPENAI_API_KEY` and/or `ANTHROPIC_API_KEY`); web search needs `TAVILY_API_KEY`
+- Document upload and hybrid retrieve need `OPENAI_API_KEY` on the server (embeddings). Chat can also use `ANTHROPIC_API_KEY`. Web search needs `TAVILY_API_KEY`
 - Uploaded files on Railway Hobby use **ephemeral disk** and disappear on redeploy
 - Default **10 Ask requests per account per day**; after a too many requests (429) response the UI also locks Ask/Upload for that account on the client
 - Prefer short PDFs (~15 pages) or questions about one section at a time
 
 ## Quick start
 
-**Prerequisites:** Docker, Docker Compose, and at least one LLM API key.
+**Prerequisites:** Docker, Docker Compose, and an OpenAI API key (Anthropic optional for chat).
 
 ```bash
 git clone https://github.com/mercuriorenau/Agentic-RAG-API.git
 cd Agentic-RAG-API
 cp .env.example .env
-# Set SECRET_KEY, OPENAI_API_KEY and/or ANTHROPIC_API_KEY
+# Set SECRET_KEY and OPENAI_API_KEY (required for embeddings / RAG)
+# Optional: ANTHROPIC_API_KEY for Claude chat
 # For email/password signup: BREVO_API_KEY + SMTP_FROM_EMAIL (verified sender)
 docker compose up --build -d
 ```
@@ -129,7 +132,7 @@ docker compose up --build -d
 - OpenAPI: `http://localhost:8000/docs`
 - Health: `curl http://localhost:8000/health`
 
-Email/password signup needs outbound email. On Railway Hobby use **Brevo** (`BREVO_API_KEY`, `SMTP_FROM_EMAIL`). Locally you can use Gmail SMTP (`SMTP_USERNAME` / `SMTP_PASSWORD` App Password). Set `APP_PUBLIC_URL` for verification links and OAuth callbacks.
+Email/password signup needs outbound email. Prefer **Brevo** (`BREVO_API_KEY`, `SMTP_FROM_EMAIL`) — required on Railway Hobby. Locally you can use Gmail SMTP (`SMTP_USERNAME` / `SMTP_PASSWORD` App Password). Set `APP_PUBLIC_URL` for verification links. For Google OAuth, also set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `GOOGLE_REDIRECT_URI` (e.g. `http://localhost:8000/api/v1/auth/google/callback`).
 
 ## Example usage
 
@@ -174,6 +177,7 @@ curl -X POST http://localhost:8000/api/v1/queries \
 | POST | `/api/v1/auth/forgot-password` | No | Send reset code |
 | POST | `/api/v1/auth/reset-password` | No | Confirm code + new password (returns JWT) |
 | GET | `/api/v1/auth/google` | No | Start Google OAuth |
+| GET | `/api/v1/auth/google/callback` | No | OAuth callback |
 | GET | `/api/v1/models` | No | Available model choices |
 | GET | `/api/v1/chats` | JWT | List chats (creates one if empty) |
 | POST | `/api/v1/chats` | JWT | Create chat |
@@ -200,7 +204,8 @@ Copy `.env.example` for the full list. Important knobs:
 |----------|------|---------|
 | `DATABASE_URL` | Async Postgres URL | local Compose URL |
 | `SECRET_KEY` | JWT signing | change in production |
-| `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` | LLM providers | at least one |
+| `OPENAI_API_KEY` | Embeddings + chat (+ rerank / Self-RAG) | **required for RAG** |
+| `ANTHROPIC_API_KEY` | Optional Claude chat | optional |
 | `TAVILY_API_KEY` | Web search | optional |
 | `CHAT_MODEL` / `ANTHROPIC_CHAT_MODEL` | Default chat models | `gpt-4.1` / `claude-sonnet-4-5` |
 | `TOP_K` / `TOP_K_MAX` | Focused vs capped survey retrieve | `5` / `8` |
@@ -208,8 +213,9 @@ Copy `.env.example` for the full list. Important knobs:
 | `RATE_LIMIT_QUERY` | Ask budget per account | `10/day` |
 | `RATE_LIMIT_BYPASS_EMAILS` | Owner emails exempt from Ask limit | empty |
 | `MAX_QUERY_LENGTH` | Question character cap | `600` |
-| `BREVO_API_KEY` / `SMTP_FROM_EMAIL` | Signup/reset email (Railway) | required for email auth on Hobby |
-| `APP_PUBLIC_URL` | Public URL for verify links + OAuth | `http://localhost:8000` |
+| `BREVO_API_KEY` / `SMTP_FROM_EMAIL` | Signup/reset email | required for email auth on Railway Hobby |
+| `APP_PUBLIC_URL` | Public URL for verify links | `http://localhost:8000` |
+| `GOOGLE_REDIRECT_URI` | Google OAuth callback URL | see `.env.example` |
 
 ## Development, tests, and evals
 
@@ -233,6 +239,8 @@ Frontend hot reload (Vite proxies `/api` → `http://localhost:8000`):
 cd frontend && npm run dev
 ```
 
+**Tests:** `pytest --cov=app` — **141** tests collected; coverage must stay at least **80%** on `app` (`fail_under` in `pyproject.toml`).
+
 **Evals**
 
 | Command | What it does |
@@ -241,7 +249,7 @@ cd frontend && npm run dev
 | `python -m evals.run_evals --live` | Seed fixtures, real retrieve (+ agent when keys allow) |
 | `python -m evals.run_evals --live --judge` | Live path + LLM-as-judge (extra API cost) |
 
-Scorers cover retrieval relevance, groundedness, and route match (`evals/scorers.py`). Cases and fixtures live under `evals/`.
+Scorers cover retrieval relevance, groundedness, and route match (`evals/scorers.py`). Cases and fixtures live under `evals/`. Live + judge can skip the judge on empty-retrieve / low-groundedness fixtures by design.
 
 ### Latest offline results
 
@@ -266,7 +274,7 @@ Low relevance on `web_current_event` and low groundedness on `ungrounded_halluci
 1. Create a Railway project.
 2. Add **Postgres with pgvector** (plain Postgres lacks `vector`; boot fails on `CREATE EXTENSION vector`).
 3. Deploy this repo (`railway.toml` + `Dockerfile`).
-4. Set on the app service: `DATABASE_URL`, `SECRET_KEY`, LLM keys, `BREVO_API_KEY` + `SMTP_FROM_EMAIL` for email auth, `APP_PUBLIC_URL` to your public domain, optional Google/Tavily keys, and `RATE_LIMIT_QUERY=10/day` for public demos.
+4. Set on the app service: `DATABASE_URL`, `SECRET_KEY`, `OPENAI_API_KEY`, optional `ANTHROPIC_API_KEY` / Tavily / Google keys, `BREVO_API_KEY` + `SMTP_FROM_EMAIL` for email auth, `APP_PUBLIC_URL` to your public domain, matching `GOOGLE_REDIRECT_URI` if using Google, and `RATE_LIMIT_QUERY=10/day` for public demos.
 5. Generate a public domain under Networking.
 6. `entrypoint.sh` runs `alembic upgrade head` and listens on `$PORT`.
 
@@ -278,13 +286,11 @@ alembic/             Schema migrations
 frontend/            React + Vite UI
 evals/               Offline + live evaluation harness
 tests/               Unit and integration tests
-docs/demo.gif        Screen recording (add this file)
+docs/demo.gif        Screen recording of the live UI
 Dockerfile           Production image
 docker-compose.yml   Local API + pgvector
 ```
 
 ## Disclaimer
 
-Solo portfolio / learning demo. Do not upload confidential data. Fair-use rate limits and retrieval caps are intentional to keep API cost bounded. No warranty; use at your own risk.
-
-There is no separate license file in this repo yet. Treat the code as source-available for portfolio review unless a `LICENSE` is added later.
+Portfolio / learning demo only. Do not upload confidential data. Fair-use rate limits and retrieval caps are intentional to keep API cost bounded. No warranty; use at your own risk.

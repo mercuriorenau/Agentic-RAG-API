@@ -1,1 +1,3 @@
-# Placeholder for docs/demo.gif (screen recording of the live UI).
+# Docs
+
+`demo.gif` — screen recording of the live Agentic RAG UI (upload → ask → citations).
