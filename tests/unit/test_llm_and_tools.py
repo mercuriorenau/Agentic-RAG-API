@@ -87,6 +87,10 @@ async def test_anthropic_provider_parses_tool_use() -> None:
     )
     assert result.content == "Looking up docs"
     assert result.tool_calls[0].name == "web_search"
+    create_kwargs = provider.client.messages.create.await_args.kwargs
+    assert "temperature" not in create_kwargs or isinstance(
+        create_kwargs.get("temperature"), (int, float)
+    )
 
 
 @pytest.mark.asyncio

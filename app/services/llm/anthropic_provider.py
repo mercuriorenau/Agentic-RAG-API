@@ -1,3 +1,4 @@
+import inspect
 from typing import Any
 
 from anthropic import AsyncAnthropic
@@ -26,8 +27,10 @@ class AnthropicProvider:
             "model": self.model_name,
             "max_tokens": 2048,
             "messages": conversation,
-            "temperature": temperature,
         }
+        # anthropic>=1.x removed temperature from messages.create
+        if "temperature" in inspect.signature(self.client.messages.create).parameters:
+            kwargs["temperature"] = temperature
         if system_parts:
             kwargs["system"] = "\n\n".join(system_parts)
         if tools:

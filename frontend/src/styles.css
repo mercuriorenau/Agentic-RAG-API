@@ -862,11 +862,22 @@ select {
 select {
   appearance: none;
   -webkit-appearance: none;
+  -moz-appearance: none;
   padding-right: 2.4rem;
+  /* Opaque fill: Windows native menus ignore translucent rgba and wash out text. */
+  background-color: #1c2416;
+  color: #f2f7ea;
+  color-scheme: dark;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none'%3E%3Cpath d='M1.5 1.75L6 6.25L10.5 1.75' stroke='%239aab9f' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 1rem center;
   background-size: 0.75rem;
+}
+
+select option,
+select optgroup {
+  background-color: #1c2416;
+  color: #f2f7ea;
 }
 
 textarea {
